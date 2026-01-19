@@ -78,6 +78,8 @@ What differentiates Emissary from other messaging/dispatch libraries? The librar
 
 ### [Java 17 Benchmarks](https://jmh.morethan.io/?source=https://raw.githubusercontent.com/joel-jeremy/emissary/main/emissary-core/src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks/results-java17.json)
 
+### [Java 21 Benchmarks](https://jmh.morethan.io/?source=https://raw.githubusercontent.com/joel-jeremy/emissary/main/emissary-core/src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks/results-java21.json)
+
 ## Requests
 
 Requests are messages that either:
