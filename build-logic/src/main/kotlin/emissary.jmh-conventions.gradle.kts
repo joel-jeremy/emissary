@@ -21,15 +21,3 @@ jmh {
     languageVersion = JavaLanguageVersion.of(JavaVersion.current().majorVersion)
   }
 }
-
-/**
- * Ideally every LTS release (succeeding the version used in source compilation) 
- * plus the latest released non-LTS version.
- */
-fun additionalJmhRunsOnJvmVersions(): List<JavaLanguageVersion> {
-  // 25 is enabled by default (Default java-conventions toolchain is 25)
-  val defaultJvmVersions = "11,17,21"
-  val jvmVersions = findProperty("additionalJmhRunsOnJvmVersions") as String?
-      ?: defaultJvmVersions
-  return jvmVersions.split(",").filter { it.isNotEmpty() }.map { JavaLanguageVersion.of(it) }
-}
