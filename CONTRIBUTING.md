@@ -17,8 +17,8 @@ Got an idea to enhance the library? Please feel free to create an issue describi
 
 To be able to work on this project, the following software needs to be installed on your machine:
 
-- Java (>= 21)
-  - Gradle is run on Java 21 but source code is compiled to Java 11.
+- Java (>= 25)
+  - Gradle is run on Java 25 but source code is compiled to Java 11.
 - Docker (Rancher Desktop or Docker Desktop)
   - For integration tests.
 - Git
