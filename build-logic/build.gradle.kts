@@ -15,5 +15,6 @@ dependencies {
   implementation(libs.nullaway.plugin)
   implementation(libs.spotless.plugin)
   implementation(libs.dependencyupdates.plugin)
+  implementation(libs.jmh.plugin)
   implementation(files(libs.javaClass.superclass.protectionDomain.codeSource.location))
 }

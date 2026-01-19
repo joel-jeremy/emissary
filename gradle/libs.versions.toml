@@ -24,6 +24,7 @@ spotless-plugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", ver
 dependencyupdates-plugin = { module = "com.github.ben-manes:gradle-versions-plugin", version.ref = "dependencyupdates-plugin" }
 snyk-plugin = { module = "gradle.plugin.io.snyk.gradle.plugin:snyk", version.ref = "snyk-plugin" }
 sonarqube-plugin = { module = "org.sonarsource.scanner.gradle:sonarqube-gradle-plugin", version.ref = "sonarqube-plugin" }
+jmh-plugin = { module = "me.champeau.jmh:me.champeau.jmh.gradle.plugin", version.ref = "jmh-plugin" }
 
 [plugins]
 jmh = { id = "me.champeau.jmh", version.ref = "jmh-plugin" }
