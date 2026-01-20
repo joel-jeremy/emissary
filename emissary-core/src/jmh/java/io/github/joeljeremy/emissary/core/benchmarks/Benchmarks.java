@@ -59,11 +59,11 @@ public abstract class Benchmarks {
     private EventBus eventBus;
 
     @Setup
-    public void setup() throws Throwable {
+    public void setup(Blackhole blackhole) throws Throwable {
       // Emissary.
 
       emissaryRequest = new EmissaryRequest();
-      emissaryRequestHandler = new EmissaryRequestHandler();
+      emissaryRequestHandler = new EmissaryRequestHandler(blackhole);
       emissaryRequestDispatcher =
           Emissary.builder()
               .instanceProvider(c -> emissaryRequestHandler)
@@ -71,7 +71,7 @@ public abstract class Benchmarks {
               .build();
 
       emissaryEvent = new EmissaryEvent();
-      emissaryEventHandler = new EmissaryEventHandler();
+      emissaryEventHandler = new EmissaryEventHandler(blackhole);
       emissaryEventPublisher =
           Emissary.builder()
               .instanceProvider(c -> emissaryEventHandler)
@@ -81,7 +81,7 @@ public abstract class Benchmarks {
       // Spring
 
       springEvent = new SpringEvent();
-      springEventListener = new SpringEventListener();
+      springEventListener = new SpringEventListener(blackhole);
       var context = new GenericApplicationContext();
       context.registerBean(SpringEventListener.class, () -> springEventListener);
       context.refresh();
@@ -89,17 +89,17 @@ public abstract class Benchmarks {
 
       // Pipelinr
 
-      pipelinrCommandHandler = new PipelinrCommandHandler();
       pipelinrCommand = new PipelinrCommand();
+      pipelinrCommandHandler = new PipelinrCommandHandler(blackhole);
       commandPipelinr = new Pipelinr().with(() -> Stream.of(pipelinrCommandHandler));
 
-      pipelinrNotificationHandler = new PipelinrNotificationHandler();
       pipelinrNotification = new PipelinrNotification();
+      pipelinrNotificationHandler = new PipelinrNotificationHandler(blackhole);
       notificationPipelinr = new Pipelinr().with(() -> Stream.of(pipelinrNotificationHandler));
 
       // EventBus
       eventBusMessage = new EventBusMessage();
-      eventBusSubscriber = new EventBusSubsriber();
+      eventBusSubscriber = new EventBusSubsriber(blackhole);
       eventBus = EventBus.getDefault();
       eventBus.register(eventBusSubscriber);
     }
@@ -116,76 +116,94 @@ public abstract class Benchmarks {
   public static class BenchmarksThrpt extends Benchmarks {}
 
   @Benchmark
-  public void emissaryEvent(BenchmarkState state, Blackhole blackhole) {
+  public void emissaryEvent(BenchmarkState state) {
     state.emissaryEventPublisher.publish(state.emissaryEvent);
-    blackhole.consume(state.emissaryEvent);
   }
 
   @Benchmark
-  public void springEvent(BenchmarkState state, Blackhole blackhole) {
+  public void springEvent(BenchmarkState state) {
     state.springEventPublisher.publishEvent(state.springEvent);
-    blackhole.consume(state.springEvent);
   }
 
   @Benchmark
-  public void pipelinrNotification(BenchmarkState state, Blackhole blackhole) {
+  public void pipelinrNotification(BenchmarkState state) {
     state.notificationPipelinr.send(state.pipelinrNotification);
-    blackhole.consume(state.pipelinrNotification);
   }
 
   @Benchmark
-  public void eventBusEvent(BenchmarkState state, Blackhole blackhole) {
+  public void eventBusEvent(BenchmarkState state) {
     state.eventBus.post(state.eventBusMessage);
-    blackhole.consume(state.eventBusMessage);
   }
 
   // Single dispatch benchmarks.
 
   @Benchmark
-  public void emissaryRequest(BenchmarkState state, Blackhole blackhole) {
+  public void emissaryRequest(BenchmarkState state) {
     state.emissaryRequestDispatcher.send(state.emissaryRequest);
-    blackhole.consume(state.emissaryRequest);
   }
 
   @Benchmark
-  public void pipelinrCommand(BenchmarkState state, Blackhole blackhole) {
+  public void pipelinrCommand(BenchmarkState state) {
     state.commandPipelinr.send(state.pipelinrCommand);
-    blackhole.consume(state.pipelinrCommand);
   }
 
   public static class EmissaryRequest implements Request<Void> {}
 
   public static class EmissaryRequestHandler {
+    private final Blackhole blackhole;
+
+    public EmissaryRequestHandler(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
     @RequestHandler
     public void handle(EmissaryRequest request) {
-      // No-op.
+      blackhole.consume(request);
     }
   }
 
   public static class EmissaryEvent implements Event {}
 
   public static class EmissaryEventHandler {
+    private final Blackhole blackhole;
+
+    public EmissaryEventHandler(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
     @EventHandler
     public void handle(EmissaryEvent event) {
-      // No-op.
+      blackhole.consume(event);
     }
   }
 
   public static class SpringEvent {}
 
   public static class SpringEventListener {
+    private final Blackhole blackhole;
+
+    public SpringEventListener(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
     @EventListener
     public void handle(SpringEvent event) {
-      // No-op.
+      blackhole.consume(event);
     }
   }
 
   public static class PipelinrCommand implements Command<Voidy> {}
 
   public static class PipelinrCommandHandler implements Command.Handler<PipelinrCommand, Voidy> {
+    private final Blackhole blackhole;
+
+    public PipelinrCommandHandler(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
     @Override
     public Voidy handle(PipelinrCommand command) {
-      // No-op.
+      blackhole.consume(command);
       return null;
     }
   }
@@ -194,18 +212,30 @@ public abstract class Benchmarks {
 
   public static class PipelinrNotificationHandler
       implements Notification.Handler<PipelinrNotification> {
+    private final Blackhole blackhole;
+
+    public PipelinrNotificationHandler(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
     @Override
     public void handle(PipelinrNotification notification) {
-      // No-op.
+      blackhole.consume(notification);
     }
   }
 
   public static class EventBusMessage {}
 
   public static class EventBusSubsriber {
+    private final Blackhole blackhole;
+
+    public EventBusSubsriber(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
     @Subscribe
     public void handle(EventBusMessage event) {
-      // No-op.
+      blackhole.consume(event);
     }
   }
 }
