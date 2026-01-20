@@ -19,7 +19,7 @@
 <!-- Commenting out until issue gets fixed: https://github.com/snyk/cli/issues/668 -->
 <!-- [![Known Vulnerabilities](https://snyk.io/test/github/joel-jeremy/emissary/badge.svg)](https://snyk.io/test/github/joel-jeremy/emissary) -->
 
-A simple yet 🗲FAST🗲 library to dispatch requests and events to corresponding handlers 🚀
+A simple, lightweight, yet 🗲FAST🗲 messaging library for decoupling messages (requests and events) and message handlers 🚀
 
 The library aims to take advantage of the intuitiveness of using the annotations for handlers (e.g. `@RequestHandler`/`@EventHandler`) without the drawbacks of reflection.
 
