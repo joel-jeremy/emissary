@@ -23,7 +23,7 @@ A simple, lightweight, yet 🗲FAST🗲 messaging library for decoupling message
 
 The library aims to take advantage of the intuitiveness of using the annotations for handlers (e.g. `@RequestHandler`/`@EventHandler`) without the drawbacks of reflection.
 
-The library aims to help build applications which apply the [Command Query Responsibility Segregation](https://martinfowler.com/bliki/CQRS.html) (CQRS) pattern.  
+The library aims to make it easy to build applications that apply the [Command Query Responsibility Segregation](https://martinfowler.com/bliki/CQRS.html) (CQRS) pattern, but it is not in any way limited to that pattern only. 
 
 ## Like the project?
 
@@ -92,10 +92,10 @@ Requests are messages that either:
     - Queries in [CQRS](https://martinfowler.com/bliki/CQRS.html)
 
 ```java
-public class GreetCommand implements Request<Void> {
+public class CreateFooCommand implements Request<Void> {
     private final String name;
     
-    public GreetRequest(String name) {
+    public CreateFooCommand(String name) {
         this.name = name;
     }
     
@@ -104,7 +104,17 @@ public class GreetCommand implements Request<Void> {
     }
 }
 
-public class PingQuery implements Request<Pong> {}
+public class GetFooByNameQuery implements Request<Foo> {
+    private final String name;
+    
+    public GetFooByNameQuery(String name) {
+        this.name = name;
+    }
+    
+    public String name() {
+        return name;
+    }
+}
 ```
 
 ## Request Handlers
@@ -116,17 +126,17 @@ A request must only have a single request handler.
 **(`@RequestHandler`s fully support methods with `void` return types! No need to set method return type to `Void` and return `null` for no reason.)**
 
 ```java
-public class GreetCommandHandler {
+public class CreateFooCommandHandler {
     @RequestHandler
-    public void handle(GreetCommand command) {
-        sayHi(command.name());
+    public void handle(CreateFooCommand command) {
+        insertFooToDatabase(command.name());
     }
 }
 
-public class PingQueryHandler {
+public class GetFooQueryHandler {
     @RequestHandler
-    public Pong handle(PingQuery query) {
-        return new Pong("Here's your pong!");
+    public Foo handle(GetFooByNameQuery query) {
+        return getFooFromDatabase(query.name());
     }
 }
 ```
@@ -145,16 +155,16 @@ public static void main(String[] args) {
     Dispatcher dispatcher = Emissary.builder()
         .instanceProvider(applicationContext::getBean)
         .requests(config -> config.handlers(
-            GreetCommandHandler.java,
-            PingQueryHandler.java
+            CreateFooCommandHandler.java,
+            GetFooQueryHandler.java
         ))
         .build();
 
     // Send command!
-    dispatcher.send(new GreetCommand("Deez"));
+    dispatcher.send(new CreateFooCommand("Emissary"));
 
     // Send query!
-    Optional<Pong> pong = dispatcher.send(new PingQuery());
+    Optional<Pong> pong = dispatcher.send(new GetFooByNameQuery("Emissary"));
 }
 ```
 
@@ -163,15 +173,15 @@ public static void main(String[] args) {
 Events are messages that indicate that something has occurred in the system.
 
 ```java
-public class GreetedEvent implements Event {
-    private final String greeting;
+public class FooCreatedEvent implements Event {
+    private final String name;
 
-    public GreetedEvent(String greeting) {
-        this.greeting = greeting;
+    public FooCreatedEvent(String name) {
+        this.name = name;
     }
 
-    public String greeting() {
-        return greeting;
+    public String name() {
+        return name;
     }
 }
 ```
@@ -183,20 +193,15 @@ Events are handled by event handlers. Event handlers can be registered through t
 An event can have zero or more event handlers.
 
 ```java
-public class GreetedEventHandler {
+public class FooEventHandler {
     @EventHandler
-    public void sayHello(GreetedEvent event) {
-        // Well, hello!
+    public void notifyA(FooCreatedEvent event) {
+        helloFoo(event.name());
     }
 
     @EventHandler
-    public void sayKumusta(GreetedEvent event) {
-        // Well, kumusta?
-    }
-
-    @EventHandler
-    public void sayGotEm(GreetedEvent event) {
-        // Got 'em! 
+    public void notifyB(FooCreatedEvent event) {
+        kumustaFoo(event.name());
     }
 }
 ```
@@ -215,12 +220,12 @@ public static void main(String[] args) {
     Publisher publisher = Emissary.builder()
         .instanceProvider(applicationContext::getBean)
         .events(config -> config.handlers(
-            GreetedEventHandler.java
+            FooEventHandler.java
         ))
         .build();
 
     // Publish event!
-    publisher.publish(new GreetedEvent("Hi from Deez!"));
+    publisher.publish(new FooCreatedEvent("Emissary"));
 }
 ```
 
