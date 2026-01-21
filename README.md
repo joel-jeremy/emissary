@@ -154,10 +154,7 @@ public static void main(String[] args) {
     // Emissary implements the Dispatcher interface.
     Dispatcher dispatcher = Emissary.builder()
         .instanceProvider(applicationContext::getBean)
-        .requests(config -> config.handlers(
-            CreateFooCommandHandler.java,
-            GetFooQueryHandler.java
-        ))
+        .requests(config -> config.handlers(CreateFooCommandHandler.class, GetFooQueryHandler.class))
         .build();
 
     // Send command!
@@ -219,9 +216,7 @@ public static void main(String[] args) {
     // Emissary implements the Publisher interface.
     Publisher publisher = Emissary.builder()
         .instanceProvider(applicationContext::getBean)
-        .events(config -> config.handlers(
-            FooEventHandler.java
-        ))
+        .events(config -> config.handlers(FooEventHandler.class))
         .build();
 
     // Publish event!
@@ -324,12 +319,8 @@ public static void main(String[] args) {
   // Register handlers and custom annotations.
   Emissary emissary = Emissary.builder()
       .instanceProvider(applicationContext::getBean)
-      .requests(config -> 
-          config.handlerAnnotations(AwesomeRequestHandler.class)
-              .handlers(MyRequestHandler.class))
-      .events(config -> 
-          config.handlerAnnotations(AwesomeEventHandler.java)
-              .handlers(MyEventHandler.class))
+      .requests(config -> config.handlerAnnotations(AwesomeRequestHandler.class).handlers(MyRequestHandler.class))
+      .events(config -> config.handlerAnnotations(AwesomeEventHandler.class).handlers(MyEventHandler.class))
       .build();
 }
 ```
@@ -347,15 +338,9 @@ Users can create a new implementation and override the defaults by:
 ```java
 // Register custom invocation strategy.
 Emissary emissary = Emissary.builder()
-    .requests(config -> 
-        config.invocationStrategy(
-            new LoggingInvocationStrategy(
-                new RetryOnErrorInvocationStrategy())))
-    .events(config -> 
-        config.invocationStrategy(
-            new LoggingInvocationStrategy(
-                new OrderGuaranteedInvocationStrategy())))
-      .build();
+    .requests(config -> config.invocationStrategy(new CustomRetryOnErrorInvocationStrategy()))
+    .events(config -> config.invocationStrategy(new CustomOrderGuaranteedInvocationStrategy()))
+    .build();
 ```
 
 ---
