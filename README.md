@@ -71,8 +71,8 @@ module foo.bar {
 
 What differentiates Emissary from other messaging/dispatch libraries? The library takes advantage of the benefits provided by [java.lang.invoke.LambdaMetafactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html) to avoid the cost of invoking methods reflectively. This results in performance close to directly invoking the request handler and event handler methods!
 
-### ~ 1000% more throughput compared to other similar libraries (Spring Events, Pipelinr, etc)
-### ~ 90% less time compared to other similar libraries (Spring Events, Pipelinr, etc)
+### ~ 1000% more throughput compared to other similar libraries (Spring Events, Pipelinr, EventBus)
+### ~ 90% faster compared to other similar libraries (Spring Events, Pipelinr, EventBus)
 
 ### [Java 25 Benchmarks](https://jmh.morethan.io/?source=https://raw.githubusercontent.com/joel-jeremy/emissary/main/emissary-core/src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks/results-java25.json)
 
@@ -154,10 +154,7 @@ public static void main(String[] args) {
     // Emissary implements the Dispatcher interface.
     Dispatcher dispatcher = Emissary.builder()
         .instanceProvider(applicationContext::getBean)
-        .requests(config -> config.handlers(
-            CreateFooCommandHandler.java,
-            GetFooQueryHandler.java
-        ))
+        .requests(config -> config.handlers(CreateFooCommandHandler.class, GetFooQueryHandler.class))
         .build();
 
     // Send command!
@@ -219,9 +216,7 @@ public static void main(String[] args) {
     // Emissary implements the Publisher interface.
     Publisher publisher = Emissary.builder()
         .instanceProvider(applicationContext::getBean)
-        .events(config -> config.handlers(
-            FooEventHandler.java
-        ))
+        .events(config -> config.handlers(FooEventHandler.class))
         .build();
 
     // Publish event!
@@ -324,12 +319,8 @@ public static void main(String[] args) {
   // Register handlers and custom annotations.
   Emissary emissary = Emissary.builder()
       .instanceProvider(applicationContext::getBean)
-      .requests(config -> 
-          config.handlerAnnotations(AwesomeRequestHandler.class)
-              .handlers(MyRequestHandler.class))
-      .events(config -> 
-          config.handlerAnnotations(AwesomeEventHandler.java)
-              .handlers(MyEventHandler.class))
+      .requests(config -> config.handlerAnnotations(AwesomeRequestHandler.class).handlers(MyRequestHandler.class))
+      .events(config -> config.handlerAnnotations(AwesomeEventHandler.class).handlers(MyEventHandler.class))
       .build();
 }
 ```
@@ -347,15 +338,9 @@ Users can create a new implementation and override the defaults by:
 ```java
 // Register custom invocation strategy.
 Emissary emissary = Emissary.builder()
-    .requests(config -> 
-        config.invocationStrategy(
-            new LoggingInvocationStrategy(
-                new RetryOnErrorInvocationStrategy())))
-    .events(config -> 
-        config.invocationStrategy(
-            new LoggingInvocationStrategy(
-                new OrderGuaranteedInvocationStrategy())))
-      .build();
+    .requests(config -> config.invocationStrategy(new CustomRetryOnErrorInvocationStrategy()))
+    .events(config -> config.invocationStrategy(new CustomOrderGuaranteedInvocationStrategy()))
+    .build();
 ```
 
 ---
