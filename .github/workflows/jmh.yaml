@@ -51,6 +51,7 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           branch-suffix: timestamp
-          title: "Add new JMH results"
-          body: "This PR contains auto-generated JMH result files."
+          title: "New v${{ matrix.java}} JMH results"
+          body: "This PR contains auto-generated v${{ matrix.java}} JMH result files."
+          commit-message: "[skip ci] New v${{ matrix.java}} JMH results"
 
