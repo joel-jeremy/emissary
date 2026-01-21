@@ -30,28 +30,27 @@ jobs:
       - name: Run JMH via Gradle
         run: ./gradlew jmh
 
-      - name: Set up Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      # - name: Set up Git
+      #   run: |
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Create new branch
-        run: |
-          BRANCH_NAME="jmh-$(date +%s)"
-          git checkout -b $BRANCH_NAME
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+      # - name: Create new branch
+      #   run: |
+      #     BRANCH_NAME="jmh-$(date +%s)"
+      #     git checkout -b $BRANCH_NAME
+      #     echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Commit changes
-        run: |
-          git add .
-          git commit -m "[skip ci] New JMH results"
-          git push origin ${{ env.BRANCH_NAME }}
+      # - name: Commit changes
+      #   run: |
+      #     git add .
+      #     git commit -m "[skip ci] New JMH results"
+      #     git push origin ${{ env.BRANCH_NAME }}
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v8
         with:
-          base: main
-          branch: ${{ env.BRANCH_NAME }}
+          branch-suffix: timestamp
           title: "Add new JMH results"
           body: "This PR contains auto-generated JMH result files."
 
