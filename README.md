@@ -19,11 +19,11 @@
 <!-- Commenting out until issue gets fixed: https://github.com/snyk/cli/issues/668 -->
 <!-- [![Known Vulnerabilities](https://snyk.io/test/github/joel-jeremy/emissary/badge.svg)](https://snyk.io/test/github/joel-jeremy/emissary) -->
 
-A simple, lightweight, yet 🗲FAST🗲 messaging library for decoupling messages (requests and events) and message handlers 🚀
+A simple-to-use, no dependency, yet 🗲BLAZING FAST🗲 messaging library for decoupling messages (requests and events) and message handlers 🚀
 
-The library aims to take advantage of the intuitiveness of using the annotations for handlers (e.g. `@RequestHandler`/`@EventHandler`) without the drawbacks of reflection.
+Emissary aims to take advantage of the simplicity of using the annotations for handlers (e.g. `@RequestHandler`/`@EventHandler`) without the drawbacks of reflection (slow).
 
-The library aims to make it easy to build applications that apply the [Command Query Responsibility Segregation](https://martinfowler.com/bliki/CQRS.html) (CQRS) pattern, but it is not in any way limited to that pattern only. 
+Emissary aims to make it easy to build applications that apply the [Command Query Responsibility Segregation](https://martinfowler.com/bliki/CQRS.html) (CQRS) pattern, but it is not in any way limited to that pattern only. 
 
 ## Like the project?
 
@@ -69,10 +69,10 @@ module foo.bar {
 
 ## Performance
 
-What differentiates Emissary from other messaging/dispatch libraries? The library takes advantage of the benefits provided by [java.lang.invoke.LambdaMetafactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html) to avoid the cost of invoking methods reflectively. This results in performance close to directly invoking the request handler and event handler methods!
+What differentiates Emissary from other messaging/dispatch libraries? It takes advantage of [java.lang.invoke.LambdaMetafactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html) to avoid the cost of invoking methods reflectively. This results in performance close to directly invoking the request handler and event handler methods!
 
-### ~ 1000% more throughput compared to other similar libraries (Spring Events, Pipelinr, EventBus)
-### ~ 90% faster compared to other similar libraries (Spring Events, Pipelinr, EventBus)
+### ~ 1000% more throughput compared to other similar libraries (Spring's ApplicationEventPublisher, Pipelinr, EventBus)
+### ~ 90% faster compared to other similar libraries (Spring's ApplicationEventPublisher, Pipelinr, EventBus)
 
 ### [Java 25 Benchmarks](https://jmh.morethan.io/?source=https://raw.githubusercontent.com/joel-jeremy/emissary/main/emissary-core/src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks/results-java25.json)
 
