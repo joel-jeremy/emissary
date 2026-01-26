@@ -13,8 +13,6 @@ import io.github.joeljeremy.emissary.core.benchmarks.Benchmarks.EmissaryEventHan
 import io.github.joeljeremy.emissary.core.benchmarks.Benchmarks.EmissaryRequestHandler;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -54,9 +52,13 @@ public abstract class Benchmarks {
     private PipelinrNotificationHandler pipelinrNotificationHandler;
     private Pipelinr notificationPipelinr;
 
-    private EventBusMessage eventBusMessage;
-    private EventBusSubsriber eventBusSubscriber;
-    private EventBus eventBus;
+    private GreenRobotEventBusMessage greenRobotEventBusMessage;
+    private GreenRobotEventBusSubscriber greenRobotEventBusSubscriber;
+    private org.greenrobot.eventbus.EventBus greenRobotEventBus;
+
+    private GuavaEventBusMessage guavaEventBusMessage;
+    private GuavaEventBusSubscriber guavaEventBusSubscriber;
+    private com.google.common.eventbus.EventBus guavaEventBus;
 
     @Setup
     public void setup(Blackhole blackhole) throws Throwable {
@@ -97,11 +99,17 @@ public abstract class Benchmarks {
       pipelinrNotificationHandler = new PipelinrNotificationHandler(blackhole);
       notificationPipelinr = new Pipelinr().with(() -> Stream.of(pipelinrNotificationHandler));
 
-      // EventBus
-      eventBusMessage = new EventBusMessage();
-      eventBusSubscriber = new EventBusSubsriber(blackhole);
-      eventBus = EventBus.getDefault();
-      eventBus.register(eventBusSubscriber);
+      // GreenRobot EventBus
+      greenRobotEventBusMessage = new GreenRobotEventBusMessage();
+      greenRobotEventBusSubscriber = new GreenRobotEventBusSubscriber(blackhole);
+      greenRobotEventBus = org.greenrobot.eventbus.EventBus.getDefault();
+      greenRobotEventBus.register(greenRobotEventBusSubscriber);
+
+      // Guava EventBus
+      guavaEventBusMessage = new GuavaEventBusMessage();
+      guavaEventBusSubscriber = new GuavaEventBusSubscriber(blackhole);
+      guavaEventBus = new com.google.common.eventbus.EventBus();
+      guavaEventBus.register(guavaEventBusSubscriber);
     }
   }
 
@@ -131,8 +139,13 @@ public abstract class Benchmarks {
   }
 
   @Benchmark
-  public void eventBusEvent(BenchmarkState state) {
-    state.eventBus.post(state.eventBusMessage);
+  public void greenRobotEventBusEvent(BenchmarkState state) {
+    state.greenRobotEventBus.post(state.greenRobotEventBusMessage);
+  }
+
+  @Benchmark
+  public void guavaEventBusEvent(BenchmarkState state) {
+    state.guavaEventBus.post(state.guavaEventBusMessage);
   }
 
   // Single dispatch benchmarks.
@@ -224,17 +237,32 @@ public abstract class Benchmarks {
     }
   }
 
-  public static class EventBusMessage {}
+  public static class GreenRobotEventBusMessage {}
 
-  public static class EventBusSubsriber {
+  public static class GreenRobotEventBusSubscriber {
     private final Blackhole blackhole;
 
-    public EventBusSubsriber(Blackhole blackhole) {
+    public GreenRobotEventBusSubscriber(Blackhole blackhole) {
       this.blackhole = blackhole;
     }
 
-    @Subscribe
-    public void handle(EventBusMessage event) {
+    @org.greenrobot.eventbus.Subscribe
+    public void handle(GreenRobotEventBusMessage event) {
+      blackhole.consume(event);
+    }
+  }
+
+  public static class GuavaEventBusMessage {}
+
+  public static class GuavaEventBusSubscriber {
+    private final Blackhole blackhole;
+
+    public GuavaEventBusSubscriber(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
+    @com.google.common.eventbus.Subscribe
+    public void handle(GuavaEventBusMessage event) {
       blackhole.consume(event);
     }
   }
