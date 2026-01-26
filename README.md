@@ -265,6 +265,18 @@ public static void main(String[] args) {
 }
 ```
 
+```java
+// Spring Boot
+@Bean
+Emissary emissary(ApplicationContext applicationContext) {
+    return Emissary.builder()
+        .instanceProvider(applicationContext::getBean)
+        .requests(...)
+        .events(...)
+        .build();
+}
+```
+
 ### Example with Guice's Injector
 
 ```java
