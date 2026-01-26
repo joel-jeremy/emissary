@@ -6,6 +6,7 @@ dependencies {
   jmh("org.springframework:spring-context:5.3.39")
   jmh("net.sizovs:pipelinr:0.11")
   jmh("org.greenrobot:eventbus-java:3.3.1")
+  jmh("com.google.guava:guava:33.5.0-jre")
 }
 
 val benchmarksFolderPath = "src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks"
