@@ -4,6 +4,8 @@ import an.awesome.pipelinr.Command;
 import an.awesome.pipelinr.Notification;
 import an.awesome.pipelinr.Pipelinr;
 import an.awesome.pipelinr.Voidy;
+import com.squareup.otto.Bus;
+import com.squareup.otto.ThreadEnforcer;
 import io.github.joeljeremy.emissary.core.Emissary;
 import io.github.joeljeremy.emissary.core.Event;
 import io.github.joeljeremy.emissary.core.EventHandler;
@@ -70,12 +72,16 @@ public abstract class Benchmarks {
     private com.google.common.eventbus.EventBus guavaEventBus;
 
     private MBassadorEvent mbassadorEvent;
-    private MBassadorEventListener mbassadorEventListener;
+    private MBassadorEventHandler mbassadorEventListener;
     private MBassador mbassador;
 
     private RxJavaEvent rxJavaEvent;
     private RxJavaObserver rxJavaObserver;
     private RxJavaBus rxJavaBus;
+
+    private OttoEvent ottoEvent;
+    private OttoEventSubscriber ottoEventSubscriber;
+    private Bus ottoBus;
 
     @Setup
     public void setup(Blackhole blackhole) throws Throwable {
@@ -131,7 +137,7 @@ public abstract class Benchmarks {
       guavaEventBus.register(guavaEventBusSubscriber);
 
       mbassadorEvent = new MBassadorEvent();
-      mbassadorEventListener = new MBassadorEventListener(blackhole);
+      mbassadorEventListener = new MBassadorEventHandler(blackhole);
       mbassador = new MBassador();
       mbassador.subscribe(mbassadorEventListener);
 
@@ -141,6 +147,13 @@ public abstract class Benchmarks {
       rxJavaObserver = new RxJavaObserver(blackhole);
       rxJavaBus = new RxJavaBus();
       rxJavaBus.toObserverable().subscribe(rxJavaObserver);
+
+      // Otto
+
+      ottoEvent = new OttoEvent();
+      ottoEventSubscriber = new OttoEventSubscriber(blackhole);
+      ottoBus = new Bus(ThreadEnforcer.ANY);
+      ottoBus.register(ottoEventSubscriber);
     }
   }
 
@@ -187,6 +200,11 @@ public abstract class Benchmarks {
   @Benchmark
   public void rxJavaSerializedEvent(BenchmarkState state) {
     state.rxJavaBus.send(state.rxJavaEvent);
+  }
+
+  @Benchmark
+  public void ottoEvent(BenchmarkState state) {
+    state.ottoBus.post(state.ottoEvent);
   }
 
   // Single dispatch benchmarks.
@@ -311,10 +329,10 @@ public abstract class Benchmarks {
   public static class MBassadorEvent {}
 
   @Listener(references = References.Strong)
-  public static class MBassadorEventListener {
+  public static class MBassadorEventHandler {
     private final Blackhole blackhole;
 
-    public MBassadorEventListener(Blackhole blackhole) {
+    public MBassadorEventHandler(Blackhole blackhole) {
       this.blackhole = blackhole;
     }
 
@@ -355,6 +373,21 @@ public abstract class Benchmarks {
 
     public Observable<Object> toObserverable() {
       return bus;
+    }
+  }
+
+  public static class OttoEvent {}
+
+  public static class OttoEventSubscriber {
+    private final Blackhole blackhole;
+
+    public OttoEventSubscriber(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
+    @com.squareup.otto.Subscribe
+    public void handle(OttoEvent event) {
+      blackhole.consume(event);
     }
   }
 }
