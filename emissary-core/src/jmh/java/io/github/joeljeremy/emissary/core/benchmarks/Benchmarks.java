@@ -13,6 +13,10 @@ import io.github.joeljeremy.emissary.core.benchmarks.Benchmarks.EmissaryEventHan
 import io.github.joeljeremy.emissary.core.benchmarks.Benchmarks.EmissaryRequestHandler;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import net.engio.mbassy.bus.MBassador;
+import net.engio.mbassy.listener.Handler;
+import net.engio.mbassy.listener.Listener;
+import net.engio.mbassy.listener.References;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -59,6 +63,10 @@ public abstract class Benchmarks {
     private GuavaEventBusMessage guavaEventBusMessage;
     private GuavaEventBusSubscriber guavaEventBusSubscriber;
     private com.google.common.eventbus.EventBus guavaEventBus;
+
+    private MBassadorEvent mbassadorEvent;
+    private MBassadorEventListener mbassadorEventListener;
+    private MBassador mbassador;
 
     @Setup
     public void setup(Blackhole blackhole) throws Throwable {
@@ -110,6 +118,11 @@ public abstract class Benchmarks {
       guavaEventBusSubscriber = new GuavaEventBusSubscriber(blackhole);
       guavaEventBus = new com.google.common.eventbus.EventBus();
       guavaEventBus.register(guavaEventBusSubscriber);
+
+      mbassadorEvent = new MBassadorEvent();
+      mbassadorEventListener = new MBassadorEventListener(blackhole);
+      mbassador = new MBassador();
+      mbassador.subscribe(mbassadorEventListener);
     }
   }
 
@@ -146,6 +159,11 @@ public abstract class Benchmarks {
   @Benchmark
   public void guavaEventBusEvent(BenchmarkState state) {
     state.guavaEventBus.post(state.guavaEventBusMessage);
+  }
+
+  @Benchmark
+  public void mbassadorEvent(BenchmarkState state) {
+    state.mbassador.publish(state.mbassadorEvent);
   }
 
   // Single dispatch benchmarks.
@@ -263,6 +281,22 @@ public abstract class Benchmarks {
 
     @com.google.common.eventbus.Subscribe
     public void handle(GuavaEventBusMessage event) {
+      blackhole.consume(event);
+    }
+  }
+
+  public static class MBassadorEvent {}
+
+  @Listener(references = References.Strong)
+  public static class MBassadorEventListener {
+    private final Blackhole blackhole;
+
+    public MBassadorEventListener(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
+    @Handler
+    public void handle(MBassadorEvent event) {
       blackhole.consume(event);
     }
   }
