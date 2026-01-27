@@ -12,11 +12,18 @@ import java.util.List;
  */
 public class SyncEventHandlerInvocationStrategy implements Emissary.EventHandlerInvocationStrategy {
 
+  public static final SyncEventHandlerInvocationStrategy DEFAULT = Singleton.INSTANCE;
+
   /** {@inheritDoc} */
   @Override
   public <T extends Event> void invokeAll(List<RegisteredEventHandler<T>> eventHandlers, T event) {
     for (RegisteredEventHandler<T> eventHandler : eventHandlers) {
       eventHandler.invoke(event);
     }
+  }
+
+  private static class Singleton {
+    private static final SyncEventHandlerInvocationStrategy INSTANCE =
+        new SyncEventHandlerInvocationStrategy();
   }
 }

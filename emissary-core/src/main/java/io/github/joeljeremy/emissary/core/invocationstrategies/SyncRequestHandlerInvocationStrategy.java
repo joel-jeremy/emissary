@@ -13,11 +13,18 @@ import java.util.Optional;
 public class SyncRequestHandlerInvocationStrategy
     implements Emissary.RequestHandlerInvocationStrategy {
 
+  public static final SyncRequestHandlerInvocationStrategy DEFAULT = Singleton.INSTANCE;
+
   /** {@inheritDoc} */
   @Override
   public <T extends Request<R>, R> Optional<R> invoke(
       RegisteredRequestHandler<T, R> requestHandler, T request) {
 
     return requestHandler.invoke(request);
+  }
+
+  private static class Singleton {
+    private static final SyncRequestHandlerInvocationStrategy INSTANCE =
+        new SyncRequestHandlerInvocationStrategy();
   }
 }

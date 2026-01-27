@@ -531,10 +531,10 @@ public class EmissaryTests {
           }
 
           @Test
-          @DisplayName("should not when event handler invocation strategy argument is valid")
+          @DisplayName("should not throw when event handler invocation strategy argument is valid")
           void test2() {
             EventHandlingConfigurator configurator =
-                config -> config.invocationStrategy(new SyncEventHandlerInvocationStrategy());
+                config -> config.invocationStrategy(SyncEventHandlerInvocationStrategy.class);
 
             Emissary.Builder builder =
                 Emissary.builder()
@@ -655,8 +655,39 @@ public class EmissaryTests {
     }
 
     @Test
-    @DisplayName("should use request handler invocation strategy when sending requests")
+    @DisplayName("should throw when invocation strategy instance is not provided")
     void test6() {
+      var requestHandler = TestRequestHandlers.primitiveRequestHandler();
+
+      RequestHandlerInvocationStrategy invocationStrategy =
+          new RequestHandlerInvocationStrategy() {
+            @Override
+            public <T extends Request<R>, R> Optional<R> invoke(
+                RegisteredRequestHandler<T, R> requestHandler, T request) {
+              return requestHandler.invoke(request);
+            }
+          };
+
+      // Note: Not providing invocationStrategy instance to instance provider.
+      var instanceProvider = TestInstanceProviders.of(requestHandler);
+
+      var emissary =
+          Emissary.builder()
+              .instanceProvider(instanceProvider)
+              .requests(
+                  config ->
+                      config
+                          .handlers(requestHandler.getClass())
+                          .invocationStrategy(invocationStrategy.getClass()))
+              .build();
+
+      var request = new IntegerRequest("1");
+      assertThrows(IllegalStateException.class, () -> emissary.send(request));
+    }
+
+    @Test
+    @DisplayName("should use request handler invocation strategy when sending requests")
+    void test7() {
       var requestHandler = TestRequestHandlers.primitiveRequestHandler();
       var invocationStrategyInvoked = new AtomicBoolean();
 
@@ -670,7 +701,7 @@ public class EmissaryTests {
             }
           };
 
-      var instanceProvider = TestInstanceProviders.of(requestHandler);
+      var instanceProvider = TestInstanceProviders.of(requestHandler, invocationStrategy);
 
       var emissary =
           Emissary.builder()
@@ -679,7 +710,7 @@ public class EmissaryTests {
                   config ->
                       config
                           .handlers(requestHandler.getClass())
-                          .invocationStrategy(invocationStrategy))
+                          .invocationStrategy(invocationStrategy.getClass()))
               .build();
 
       var request = new IntegerRequest("1");
@@ -695,7 +726,7 @@ public class EmissaryTests {
 
     @Test
     @DisplayName("should return empty Optional when registered request handler has void result")
-    void test7() {
+    void test8() {
       var voidRequestHandler = TestRequestHandlers.voidRequestHandler();
       var instanceProvider = TestInstanceProviders.of(voidRequestHandler);
       var emissary =
@@ -717,7 +748,7 @@ public class EmissaryTests {
     @Test
     @DisplayName("should propagate exception thrown by request handler that has void result")
     // This test is true unless a custom request handler invocation strategy is used.
-    void test8() {
+    void test9() {
       var exception = new RuntimeException("Oops!");
       var throwingVoidRequestHandler = TestRequestHandlers.throwingVoidRequestHandler(exception);
       var instanceProvider = TestInstanceProviders.of(throwingVoidRequestHandler);
@@ -840,8 +871,38 @@ public class EmissaryTests {
     }
 
     @Test
-    @DisplayName("should use event handler invocation strategy when publishing events")
+    @DisplayName("should throw when invocation strategy instance is not provided")
     void test6() {
+      var eventHandler = TestEventHandlers.testEventHandler();
+
+      EventHandlerInvocationStrategy invocationStrategy =
+          new EventHandlerInvocationStrategy() {
+            @Override
+            public <T extends Event> void invokeAll(
+                List<RegisteredEventHandler<T>> eventHandlers, T event) {
+              eventHandlers.forEach(e -> e.invoke(event));
+            }
+          };
+
+      // Note: Not providing invocationStrategy instance to instance provider.
+      var instanceProvider = TestInstanceProviders.of(eventHandler);
+      var emissary =
+          Emissary.builder()
+              .instanceProvider(instanceProvider)
+              .events(
+                  config ->
+                      config
+                          .handlers(eventHandler.getClass())
+                          .invocationStrategy(invocationStrategy.getClass()))
+              .build();
+
+      var testEvent = new TestEvent("Test");
+      assertThrows(IllegalStateException.class, () -> emissary.publish(testEvent));
+    }
+
+    @Test
+    @DisplayName("should use event handler invocation strategy when publishing events")
+    void test7() {
       var eventHandler = TestEventHandlers.testEventHandler();
       var invocationStrategyInvoked = new AtomicBoolean();
 
@@ -855,7 +916,7 @@ public class EmissaryTests {
             }
           };
 
-      var instanceProvider = TestInstanceProviders.of(eventHandler);
+      var instanceProvider = TestInstanceProviders.of(eventHandler, invocationStrategy);
       var emissary =
           Emissary.builder()
               .instanceProvider(instanceProvider)
@@ -863,7 +924,7 @@ public class EmissaryTests {
                   config ->
                       config
                           .handlers(eventHandler.getClass())
-                          .invocationStrategy(invocationStrategy))
+                          .invocationStrategy(invocationStrategy.getClass()))
               .build();
 
       var testEvent = new TestEvent("Test");
