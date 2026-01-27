@@ -6,7 +6,7 @@ jobs:
     
     strategy:
       matrix:
-        java: [17, 21, 25]
+        java: [25]
 
     permissions:
       contents: write      # Needed to push changes
@@ -30,22 +30,43 @@ jobs:
       - name: Run JMH via Gradle
         run: ./gradlew jmh
 
-      # - name: Set up Git
-      #   run: |
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch-suffix: random
+          title: "New v${{ matrix.java}} JMH results"
+          body: "This PR contains auto-generated v${{ matrix.java}} JMH result files."
+          commit-message: "[skip ci] New v${{ matrix.java}} JMH results"
 
-      # - name: Create new branch
-      #   run: |
-      #     BRANCH_NAME="jmh-$(date +%s)"
-      #     git checkout -b $BRANCH_NAME
-      #     echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+  jmh-lts:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        # Previous Java LTS releases.
+        java: [11, 17, 21]
 
-      # - name: Commit changes
-      #   run: |
-      #     git add .
-      #     git commit -m "[skip ci] New JMH results"
-      #     git push origin ${{ env.BRANCH_NAME }}
+    permissions:
+      contents: write      # Needed to push changes
+      pull-requests: write # Needed to create PR
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: 'temurin'
+        
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+      
+      - name: Run JMH via Gradle
+        run: ./gradlew jmhOnJava${{ matrix.java }}
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v8
