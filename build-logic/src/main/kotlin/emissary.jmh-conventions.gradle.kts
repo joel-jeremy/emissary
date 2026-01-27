@@ -1,3 +1,5 @@
+import me.champeau.jmh.JMHTask;
+
 plugins {
   id("me.champeau.jmh")
 }
@@ -10,16 +12,53 @@ dependencies {
   jmh("net.engio:mbassador:1.3.2")
 }
 
-val benchmarksFolderPath = "src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks"
+val commonJmhVersion = "1.37"
+val commonResultFormat = "JSON"
+val commonJvmArgs = listOf("-Xmx2G")
+
+fun resultsFilePath(javaVersion: JavaLanguageVersion): String {
+  val benchmarksFolderPath = "src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks"
+  return "${benchmarksFolderPath}/results-java${javaVersion}.json"
+}
+
+fun humanOutputFilePath(javaVersion: JavaLanguageVersion): String = "reports/jmh/human-java${javaVersion}.txt"
 
 jmh {
-  jmhVersion = "1.37"
-  humanOutputFile = layout.buildDirectory.file("reports/jmh/human.txt")
-  resultsFile = layout.projectDirectory.file("${benchmarksFolderPath}/results-java${JavaVersion.current().majorVersion}.json")
-  resultFormat = "JSON"
-  jvmArgs.addAll(listOf("-Xmx2G"))
+  jmhVersion = commonJmhVersion
+  resultFormat = commonResultFormat
+  jvmArgs.addAll(commonJvmArgs)
 
-  javaLauncher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(JavaVersion.current().majorVersion)
+  humanOutputFile = layout.buildDirectory.file(humanOutputFilePath(JavaLanguageVersion.of(JavaVersion.current().majorVersion)))
+  resultsFile = layout.projectDirectory.file(resultsFilePath(JavaLanguageVersion.of(JavaVersion.current().majorVersion)))
+}
+
+additionalJmhRunsOnJvmVersions().forEach { additionalJavaVersion ->
+  val jmhTaskName = "jmhOnJava${additionalJavaVersion}"
+
+  tasks.register<JMHTask>(jmhTaskName) {
+    jmhVersion = commonJmhVersion
+    resultFormat = commonResultFormat
+    jvmArgs.addAll(commonJvmArgs)
+    
+    javaLauncher = javaToolchains.launcherFor {
+      languageVersion = additionalJavaVersion
+    }
+
+    humanOutputFile = layout.buildDirectory.file(humanOutputFilePath(additionalJavaVersion))
+    resultsFile = layout.projectDirectory.file(resultsFilePath(additionalJavaVersion))
+    
+    jarArchive = tasks.named<Jar>("jmhJar").flatMap { it.archiveFile }
   }
+}
+
+/**
+ * Ideally every LTS release (succeeding the version used in source compilation) 
+ * plus the latest released non-LTS version.
+ */
+fun additionalJmhRunsOnJvmVersions(): List<JavaLanguageVersion> {
+  // 25 is enabled by default (Default java-conventions toolchain is 25)
+  val defaultJvmVersions = "11,17,21"
+  val jvmVersions = findProperty("additionalJmhRunsOnJvmVersions") as String?
+      ?: defaultJvmVersions
+  return jvmVersions.split(",").filter { it.isNotEmpty() }.map { JavaLanguageVersion.of(it) }
 }
