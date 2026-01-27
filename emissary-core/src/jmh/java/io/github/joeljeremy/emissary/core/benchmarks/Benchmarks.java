@@ -11,6 +11,11 @@ import io.github.joeljeremy.emissary.core.Request;
 import io.github.joeljeremy.emissary.core.RequestHandler;
 import io.github.joeljeremy.emissary.core.benchmarks.Benchmarks.EmissaryEventHandler;
 import io.github.joeljeremy.emissary.core.benchmarks.Benchmarks.EmissaryRequestHandler;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import net.engio.mbassy.bus.MBassador;
@@ -68,6 +73,10 @@ public abstract class Benchmarks {
     private MBassadorEventListener mbassadorEventListener;
     private MBassador mbassador;
 
+    private RxJavaEvent rxJavaEvent;
+    private RxJavaObserver rxJavaObserver;
+    private RxJavaBus rxJavaBus;
+
     @Setup
     public void setup(Blackhole blackhole) throws Throwable {
       // Emissary.
@@ -108,12 +117,14 @@ public abstract class Benchmarks {
       notificationPipelinr = new Pipelinr().with(() -> Stream.of(pipelinrNotificationHandler));
 
       // GreenRobot EventBus
+
       greenRobotEventBusMessage = new GreenRobotEventBusMessage();
       greenRobotEventBusSubscriber = new GreenRobotEventBusSubscriber(blackhole);
       greenRobotEventBus = org.greenrobot.eventbus.EventBus.getDefault();
       greenRobotEventBus.register(greenRobotEventBusSubscriber);
 
       // Guava EventBus
+
       guavaEventBusMessage = new GuavaEventBusMessage();
       guavaEventBusSubscriber = new GuavaEventBusSubscriber(blackhole);
       guavaEventBus = new com.google.common.eventbus.EventBus();
@@ -123,6 +134,13 @@ public abstract class Benchmarks {
       mbassadorEventListener = new MBassadorEventListener(blackhole);
       mbassador = new MBassador();
       mbassador.subscribe(mbassadorEventListener);
+
+      // RxJava
+
+      rxJavaEvent = new RxJavaEvent();
+      rxJavaObserver = new RxJavaObserver(blackhole);
+      rxJavaBus = new RxJavaBus();
+      rxJavaBus.toObserverable().subscribe(rxJavaObserver);
     }
   }
 
@@ -164,6 +182,11 @@ public abstract class Benchmarks {
   @Benchmark
   public void mbassadorEvent(BenchmarkState state) {
     state.mbassador.publish(state.mbassadorEvent);
+  }
+
+  @Benchmark
+  public void rxJavaSerializedEvent(BenchmarkState state) {
+    state.rxJavaBus.send(state.rxJavaEvent);
   }
 
   // Single dispatch benchmarks.
@@ -298,6 +321,40 @@ public abstract class Benchmarks {
     @Handler
     public void handle(MBassadorEvent event) {
       blackhole.consume(event);
+    }
+  }
+
+  public static class RxJavaEvent {}
+
+  public static class RxJavaObserver implements Observer<Object> {
+    private final Blackhole blackhole;
+
+    public RxJavaObserver(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
+    public void onNext(Object event) {
+      if (event instanceof RxJavaEvent) {
+        blackhole.consume(event);
+      }
+    }
+
+    public void onSubscribe(Disposable d) {}
+
+    public void onError(Throwable e) {}
+
+    public void onComplete() {}
+  }
+
+  public static class RxJavaBus {
+    private final Subject<Object> bus = PublishSubject.create().toSerialized();
+
+    public void send(Object o) {
+      bus.onNext(o);
+    }
+
+    public Observable<Object> toObserverable() {
+      return bus;
     }
   }
 }

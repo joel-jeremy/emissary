@@ -10,6 +10,7 @@ dependencies {
   jmh("org.greenrobot:eventbus-java:3.3.1")
   jmh("com.google.guava:guava:33.5.0-jre")
   jmh("net.engio:mbassador:1.3.2")
+  jmh("io.reactivex.rxjava3:rxjava:3.1.12")
 }
 
 val commonJmhVersion = "1.37"
