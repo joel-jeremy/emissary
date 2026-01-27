@@ -11,6 +11,7 @@ dependencies {
   jmh("com.google.guava:guava:33.5.0-jre")
   jmh("net.engio:mbassador:1.3.2")
   jmh("io.reactivex.rxjava3:rxjava:3.1.12")
+  jmh("com.squareup:otto:1.3.8")
 }
 
 val commonJmhVersion = "1.37"
