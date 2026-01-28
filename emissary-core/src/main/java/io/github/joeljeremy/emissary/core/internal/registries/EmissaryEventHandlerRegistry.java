@@ -135,7 +135,7 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private static class RegisteredEventHandlersByEventType
       extends ClassValue<List<RegisteredEventHandler<?>>> {
-    private ImmutableRegisteredEventHandlersByEventType immutableDecorator =
+    private final ImmutableRegisteredEventHandlersByEventType immutableDecorator =
         new ImmutableRegisteredEventHandlersByEventType(this);
 
     @Override
@@ -157,11 +157,11 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
       // ClassValue so that the cached values are thrown away. The next `getImmutable` would then
       // invoke the immutable ClassValue's `computeValue` method to return the updated list which
       // includes the newly registered handlers.
-      refreshImmutables();
+      refreshImmutables(eventType);
     }
 
-    private void refreshImmutables() {
-      immutableDecorator = new ImmutableRegisteredEventHandlersByEventType(this);
+    private void refreshImmutables(Class<?> eventType) {
+      immutableDecorator.remove(eventType);
     }
   }
 
