@@ -24,10 +24,6 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private final RegisteredEventHandlersByEventType eventHandlersByEventType =
       new RegisteredEventHandlersByEventType();
-
-  private ImmutableRegisteredEventHandlersByEventType immutableEventHandlersByType =
-      new ImmutableRegisteredEventHandlersByEventType(eventHandlersByEventType);
-
   private final InstanceProvider instanceProvider;
   private final Set<Class<? extends Annotation>> eventHandlerAnnotations;
 
@@ -74,27 +70,13 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     List<RegisteredEventHandler<T>> eventHandlers =
-        (List) immutableEventHandlersByType.get(eventType);
+        (List) eventHandlersByEventType.getImmutable(eventType);
     return eventHandlers;
   }
 
   private void register(Class<?> eventType, Method eventHandlerMethod) {
-    requireNonNull(eventType);
-    requireNonNull(eventHandlerMethod);
-
-    List<RegisteredEventHandler<?>> handlers = eventHandlersByEventType.get(eventType);
-    handlers.add(buildEventHandler(eventHandlerMethod, instanceProvider));
-
-    refreshImmutableEventHandlerLists();
-  }
-
-  private void refreshImmutableEventHandlerLists() {
-    // Because the underlying ClassValue has changed, we need to re-initialize the optimized
-    // ClassValue so that the cached values are thrown away. The next `get` would invoke the
-    // `computeValue` method again to return the updated list which includes the newly registered
-    // handlers.
-    immutableEventHandlersByType =
-        new ImmutableRegisteredEventHandlersByEventType(eventHandlersByEventType);
+    eventHandlersByEventType.register(
+        eventType, buildEventHandler(eventHandlerMethod, instanceProvider));
   }
 
   private boolean isEventHandler(Method method) {
@@ -108,9 +90,6 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private static RegisteredEventHandler<?> buildEventHandler(
       Method eventHandlerMethod, InstanceProvider instanceProvider) {
-
-    requireNonNull(eventHandlerMethod);
-
     EventHandlerMethod eventHandlerMethodLambda =
         LambdaFactory.createLambdaFunction(eventHandlerMethod, EventHandlerMethod.class);
 
@@ -156,22 +135,47 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private static class RegisteredEventHandlersByEventType
       extends ClassValue<List<RegisteredEventHandler<?>>> {
+    private ImmutableRegisteredEventHandlersByEventType immutableDecorator =
+        new ImmutableRegisteredEventHandlersByEventType(this);
+
     @Override
     protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
       return new ArrayList<>();
     }
+
+    public List<RegisteredEventHandler<?>> getImmutable(Class<?> eventType) {
+      return immutableDecorator.get(eventType);
+    }
+
+    public void register(Class<?> eventType, RegisteredEventHandler<?> eventHandler) {
+      requireNonNull(eventType);
+      requireNonNull(eventHandler);
+
+      get(eventType).add(eventHandler);
+
+      // Because this ClassValue has changed, we need to re-initialize the immutable
+      // ClassValue so that the cached values are thrown away. The next `getImmutable` would then
+      // invoke the immutable ClassValue's `computeValue` method to return the updated list which
+      // includes the newly registered handlers.
+      refreshImmutables();
+    }
+
+    private void refreshImmutables() {
+      immutableDecorator = new ImmutableRegisteredEventHandlersByEventType(this);
+    }
   }
 
   /**
-   * Decorates the base {@link RegisteredEventHandlersByEventType} to instead return immutable
-   * lists.
+   * Decorates another {@code ClassValue<List<RegisteredEventHandler<?>>>} instance to return
+   * immutable lists.
    */
   private static class ImmutableRegisteredEventHandlersByEventType
       extends ClassValue<List<RegisteredEventHandler<?>>> {
 
-    private final RegisteredEventHandlersByEventType base;
+    private final ClassValue<List<RegisteredEventHandler<?>>> base;
 
-    public ImmutableRegisteredEventHandlersByEventType(RegisteredEventHandlersByEventType base) {
+    public ImmutableRegisteredEventHandlersByEventType(
+        ClassValue<List<RegisteredEventHandler<?>>> base) {
       this.base = requireNonNull(base);
     }
 
