@@ -206,6 +206,68 @@ public class EmissaryEventHandlerRegistryTests {
       assertNotNull(resolved);
       assertTrue(resolved.isEmpty());
     }
+
+    @Test
+    @DisplayName("should return immutable lists")
+    void test4() {
+      TestEventHandler eventHandler = TestEventHandlers.testEventHandler();
+      EmissaryEventHandlerRegistry eventHandlerRegistry =
+          buildEventHandlerRegistry(eventHandler).register(eventHandler.getClass());
+
+      // No registrations...
+      EmissaryEventHandlerRegistry emptyEventHandlerRegistry = buildEventHandlerRegistry();
+
+      List<RegisteredEventHandler<TestEvent>> resolved =
+          eventHandlerRegistry.getEventHandlersFor(TestEvent.class);
+
+      List<RegisteredEventHandler<EventWithNoHandlers>> resolvedEmpty =
+          emptyEventHandlerRegistry.getEventHandlersFor(EventWithNoHandlers.class);
+
+      assertNotNull(resolved);
+      assertFalse(resolved.isEmpty());
+      assertThrows(UnsupportedOperationException.class, () -> resolved.add(null));
+
+      assertNotNull(resolvedEmpty);
+      assertTrue(resolvedEmpty.isEmpty());
+      assertThrows(UnsupportedOperationException.class, () -> resolvedEmpty.add(null));
+    }
+
+    @Test
+    @DisplayName("should return newly registered handlers in subsequent calls")
+    void test5() {
+      TestEventHandler eventHandler1 = TestEventHandlers.testEventHandler();
+      CustomAnnotationEventHandler eventHandler2 = TestEventHandlers.customAnnotationEventHandler();
+      EmissaryEventHandlerRegistry eventHandlerRegistry =
+          buildEventHandlerRegistry(Set.of(CustomEventHandler.class), eventHandler1, eventHandler2)
+              .register(eventHandler1.getClass());
+
+      List<RegisteredEventHandler<TestEvent>> resolved =
+          eventHandlerRegistry.getEventHandlersFor(TestEvent.class);
+
+      assertNotNull(resolved);
+      assertFalse(resolved.isEmpty());
+
+      var testEvent = new TestEvent("Test");
+      resolved.forEach(h -> h.invoke(testEvent));
+
+      assertTrue(eventHandler1.hasHandled(testEvent));
+
+      // Register another handler after getEventHandlersFor calls were already made.
+      eventHandlerRegistry.register(eventHandler2.getClass());
+
+      List<RegisteredEventHandler<TestEvent>> resolvedAfterNewRegistration =
+          eventHandlerRegistry.getEventHandlersFor(TestEvent.class);
+
+      assertNotNull(resolvedAfterNewRegistration);
+      assertFalse(resolvedAfterNewRegistration.isEmpty());
+
+      var anotherTestEvent = new TestEvent("Another Test");
+      resolvedAfterNewRegistration.forEach(h -> h.invoke(anotherTestEvent));
+
+      // Event handler 2 was registered later, so it would not have handled the first event.
+      assertFalse(eventHandler2.hasHandled(testEvent));
+      assertTrue(eventHandler2.hasHandled(anotherTestEvent));
+    }
   }
 
   private EmissaryEventHandlerRegistry buildEventHandlerRegistry(Object... eventHandlers) {
