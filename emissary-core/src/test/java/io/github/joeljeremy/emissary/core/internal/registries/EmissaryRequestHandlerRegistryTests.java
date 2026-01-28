@@ -204,7 +204,7 @@ public class EmissaryRequestHandlerRegistryTests {
 
     @Test
     @DisplayName(
-        "should throw when result type is the same as the request handler method's return type")
+        "should throw when result type is not the same as the request handler method's return type")
     void test10() {
       IncompatibleRequestHandler incompatibleRequestHandler =
           TestRequestHandlers.incompatibleRequestHandler();

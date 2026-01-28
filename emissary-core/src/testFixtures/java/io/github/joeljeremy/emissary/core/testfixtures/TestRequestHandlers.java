@@ -187,7 +187,7 @@ public class TestRequestHandlers {
   public static class IncompatibleRequestHandler {
     private IncompatibleRequestHandler() {}
 
-    // Invalid. Expected result is Integer/int but method returns a Float.
+    // Invalid. Expected result is Integer/int but method returns a List.
     @RequestHandler
     public List<Integer> incompatible(IntegerRequest request) {
       return List.of();
