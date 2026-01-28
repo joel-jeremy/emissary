@@ -13,5 +13,5 @@ allprojects {
   group = "io.github.joel-jeremy.emissary"
 
   val snapshotSuffix = if (rootProject.hasProperty("release")) ""  else "-SNAPSHOT"
-  version = "2.0.0${snapshotSuffix}"
+  version = "2.1.0${snapshotSuffix}"
 }
