@@ -18,15 +18,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /** Checkout Emissary! */
 public class Emissary implements Dispatcher, Publisher {
   private static final Logger LOGGER = System.getLogger(Emissary.class.getName());
 
   private final RequestHandlerProvider requestHandlerProvider;
-  private final RequestHandlerInvocationStrategy requestHandlerInvocationStrategy;
+  private final Supplier<RequestHandlerInvocationStrategy> requestHandlerInvocationStrategyProvider;
   private final EventHandlerProvider eventHandlerProvider;
-  private final EventHandlerInvocationStrategy eventHandlerInvocationStrategy;
+  private final Supplier<EventHandlerInvocationStrategy> eventHandlerInvocationStrategyProvider;
 
   /**
    * Constructor.
@@ -41,9 +43,11 @@ public class Emissary implements Dispatcher, Publisher {
       EventHandlingConfiguration eventConfiguration) {
     this.requestHandlerProvider =
         requestConfiguration.buildRequestHandlerProvider(instanceProvider);
-    this.requestHandlerInvocationStrategy = requestConfiguration.requestHandlerInvocationStrategy;
+    this.requestHandlerInvocationStrategyProvider =
+        () -> requestConfiguration.getRequestHandlerInvocationStrategy(instanceProvider);
     this.eventHandlerProvider = eventConfiguration.buildEventHandlerProvider(instanceProvider);
-    this.eventHandlerInvocationStrategy = eventConfiguration.eventHandlerInvocationStrategy;
+    this.eventHandlerInvocationStrategyProvider =
+        () -> eventConfiguration.getEventHandlerInvocationStrategy(instanceProvider);
   }
 
   /** {@inheritDoc} */
@@ -59,8 +63,11 @@ public class Emissary implements Dispatcher, Publisher {
                     new EmissaryException(
                         "No request handler found for request key: " + requestKey + "."));
 
+    RequestHandlerInvocationStrategy invocationStrategy =
+        this.requestHandlerInvocationStrategyProvider.get();
+
     try {
-      return requestHandlerInvocationStrategy.invoke(requestHandler, request);
+      return invocationStrategy.invoke(requestHandler, request);
     } catch (Exception ex) {
       LOGGER.log(
           Level.ERROR,
@@ -85,8 +92,11 @@ public class Emissary implements Dispatcher, Publisher {
     List<RegisteredEventHandler<T>> eventHandlers =
         eventHandlerProvider.getEventHandlersFor(eventType);
 
+    EventHandlerInvocationStrategy invocationStrategy =
+        this.eventHandlerInvocationStrategyProvider.get();
+
     try {
-      eventHandlerInvocationStrategy.invokeAll(eventHandlers, event);
+      invocationStrategy.invokeAll(eventHandlers, event);
     } catch (Exception ex) {
       LOGGER.log(
           Level.ERROR,
@@ -124,7 +134,7 @@ public class Emissary implements Dispatcher, Publisher {
      * The instance provider to get instances from.
      *
      * @param instanceProvider The instance provider to get instances from.
-     * @return Deez builder.
+     * @return Emissary builder.
      */
     public Builder instanceProvider(InstanceProvider instanceProvider) {
       this.instanceProvider = requireNonNull(instanceProvider);
@@ -137,7 +147,7 @@ public class Emissary implements Dispatcher, Publisher {
      *
      * @param requestHandlingConfigurator Register a request handling configurator. Registered
      *     configurators will be executed during build time in the order they were registered.
-     * @return Deez builder.
+     * @return Emissary builder.
      */
     public Builder requests(RequestHandlingConfigurator requestHandlingConfigurator) {
       requireNonNull(requestHandlingConfigurator);
@@ -151,7 +161,7 @@ public class Emissary implements Dispatcher, Publisher {
      *
      * @param eventHandlingConfigurator Register a event handling configurator. Registered
      *     configurators will be executed during build time in the order they were registered.
-     * @return Deez builder.
+     * @return Emissary builder.
      */
     public Builder events(EventHandlingConfigurator eventHandlingConfigurator) {
       requireNonNull(eventHandlingConfigurator);
@@ -197,8 +207,8 @@ public class Emissary implements Dispatcher, Publisher {
     public static final class RequestHandlingConfiguration {
       private final Set<Class<?>> requestHandlerClasses = new HashSet<>();
       private final Set<Class<? extends Annotation>> requestHandlerAnnotations = new HashSet<>();
-      private RequestHandlerInvocationStrategy requestHandlerInvocationStrategy =
-          new SyncRequestHandlerInvocationStrategy();
+      private @Nullable Class<? extends RequestHandlerInvocationStrategy>
+          requestHandlerInvocationStrategyClass;
 
       /**
        * Register supported request handler annotations. Methods annotated with any of these
@@ -208,7 +218,7 @@ public class Emissary implements Dispatcher, Publisher {
        * @apiNote Annotations must have runtime retention policy i.e. must be annotated with
        *     {@code @Retention(RetentionPolicy.RUNTIME)}
        * @param requestHandlerAnnotations The request handler annotations to support.
-       * @return Deez request configuration.
+       * @return Emissary request configuration.
        */
       @SafeVarargs
       public final RequestHandlingConfiguration handlerAnnotations(
@@ -226,7 +236,7 @@ public class Emissary implements Dispatcher, Publisher {
        * @apiNote Annotations must have runtime retention policy i.e. must be annotated with
        *     {@code @Retention(RetentionPolicy.RUNTIME)}
        * @param requestHandlerAnnotations The request handler annotations to support.
-       * @return Deez request configuration.
+       * @return Emissary request configuration.
        */
       public final RequestHandlingConfiguration handlerAnnotations(
           Collection<Class<? extends Annotation>> requestHandlerAnnotations) {
@@ -240,7 +250,7 @@ public class Emissary implements Dispatcher, Publisher {
        * them as request handlers.
        *
        * @param requestHandlerClasses The classes to scan for supported request handler annotations.
-       * @return Deez request configuration.
+       * @return Emissary request configuration.
        */
       public final RequestHandlingConfiguration handlers(Class<?>... requestHandlerClasses) {
         requireNonNullElements(requestHandlerClasses);
@@ -253,7 +263,7 @@ public class Emissary implements Dispatcher, Publisher {
        * them as request handlers.
        *
        * @param requestHandlerClasses The classes to scan for supported request handler annotations.
-       * @return Deez request configuration.
+       * @return Emissary request configuration.
        */
       public final RequestHandlingConfiguration handlers(
           Collection<Class<?>> requestHandlerClasses) {
@@ -265,13 +275,14 @@ public class Emissary implements Dispatcher, Publisher {
       /**
        * The request handler invocation strategy to use.
        *
-       * @param requestHandlerInvocationStrategy The request handler invocation strategy to use.
-       * @return Deez request configuration.
+       * @param requestHandlerInvocationStrategyClass The request handler invocation strategy to
+       *     use.
+       * @return Emissary request configuration.
        */
       public final RequestHandlingConfiguration invocationStrategy(
-          RequestHandlerInvocationStrategy requestHandlerInvocationStrategy) {
-        requireNonNull(requestHandlerInvocationStrategy);
-        this.requestHandlerInvocationStrategy = requestHandlerInvocationStrategy;
+          Class<? extends RequestHandlerInvocationStrategy> requestHandlerInvocationStrategyClass) {
+        requireNonNull(requestHandlerInvocationStrategyClass);
+        this.requestHandlerInvocationStrategyClass = requestHandlerInvocationStrategyClass;
         return this;
       }
 
@@ -281,14 +292,33 @@ public class Emissary implements Dispatcher, Publisher {
             new EmissaryRequestHandlerRegistry(instanceProvider, requestHandlerAnnotations);
         return requestHandlerRegistry.register(requestHandlerClasses.toArray(Class<?>[]::new));
       }
+
+      private RequestHandlerInvocationStrategy getRequestHandlerInvocationStrategy(
+          InstanceProvider instanceProvider) {
+        try {
+          if (requestHandlerInvocationStrategyClass == null
+              || requestHandlerInvocationStrategyClass
+                  == SyncRequestHandlerInvocationStrategy.class) {
+            return SyncRequestHandlerInvocationStrategy.DEFAULT;
+          }
+
+          return (RequestHandlerInvocationStrategy)
+              instanceProvider.getInstance(requestHandlerInvocationStrategyClass);
+        } catch (Exception ex) {
+          throw new IllegalStateException(
+              "Failed to get a request handler invocation strategy from instance provider: "
+                  + requestHandlerInvocationStrategyClass,
+              ex);
+        }
+      }
     }
 
     /** Event handling configuration. */
     public static final class EventHandlingConfiguration {
       private final Set<Class<?>> eventHandlerClasses = new HashSet<>();
       private final Set<Class<? extends Annotation>> eventHandlerAnnotations = new HashSet<>();
-      private EventHandlerInvocationStrategy eventHandlerInvocationStrategy =
-          new SyncEventHandlerInvocationStrategy();
+      private @Nullable Class<? extends EventHandlerInvocationStrategy>
+          eventHandlerInvocationStrategyClass;
 
       /**
        * Register supported event handler annotations. Methods annotated with these annotations will
@@ -298,7 +328,7 @@ public class Emissary implements Dispatcher, Publisher {
        *     {@code @Retention(RetentionPolicy.RUNTIME)}
        * @param eventHandlerAnnotations The event handler annotations to support. The {@link
        *     EventHandler} annotation is supported by default.
-       * @return Deez request configuration.
+       * @return Emissary request configuration.
        */
       @SafeVarargs
       public final EventHandlingConfiguration handlerAnnotations(
@@ -316,7 +346,7 @@ public class Emissary implements Dispatcher, Publisher {
        *     {@code @Retention(RetentionPolicy.RUNTIME)}
        * @param eventHandlerAnnotations The event handler annotations to support. The {@link
        *     EventHandler} annotation is supported by default.
-       * @return Deez request configuration.
+       * @return Emissary request configuration.
        */
       public final EventHandlingConfiguration handlerAnnotations(
           Collection<Class<? extends Annotation>> eventHandlerAnnotations) {
@@ -330,7 +360,7 @@ public class Emissary implements Dispatcher, Publisher {
        * as event handlers.
        *
        * @param eventHandlerClasses The classes to scan for supported event handler annotations.
-       * @return Deez event configuration.
+       * @return Emissary event configuration.
        */
       public final EventHandlingConfiguration handlers(Class<?>... eventHandlerClasses) {
         requireNonNullElements(eventHandlerClasses);
@@ -343,7 +373,7 @@ public class Emissary implements Dispatcher, Publisher {
        * as event handlers.
        *
        * @param eventHandlerClasses The classes to scan for supported event handler annotations.
-       * @return Deez event configuration.
+       * @return Emissary event configuration.
        */
       public final EventHandlingConfiguration handlers(Collection<Class<?>> eventHandlerClasses) {
         requireNonNullElements(eventHandlerClasses);
@@ -354,13 +384,13 @@ public class Emissary implements Dispatcher, Publisher {
       /**
        * The event handler invocation strategy to use.
        *
-       * @param eventHandlerInvocationStrategy The event handler invocation strategy to use.
-       * @return Deez event configuration.
+       * @param eventHandlerInvocationStrategyClass The event handler invocation strategy to use.
+       * @return Emissary event configuration.
        */
       public final EventHandlingConfiguration invocationStrategy(
-          EventHandlerInvocationStrategy eventHandlerInvocationStrategy) {
-        requireNonNull(eventHandlerInvocationStrategy);
-        this.eventHandlerInvocationStrategy = eventHandlerInvocationStrategy;
+          Class<? extends EventHandlerInvocationStrategy> eventHandlerInvocationStrategyClass) {
+        requireNonNull(eventHandlerInvocationStrategyClass);
+        this.eventHandlerInvocationStrategyClass = eventHandlerInvocationStrategyClass;
         return this;
       }
 
@@ -368,6 +398,24 @@ public class Emissary implements Dispatcher, Publisher {
         var eventHandlerRegistry =
             new EmissaryEventHandlerRegistry(instanceProvider, eventHandlerAnnotations);
         return eventHandlerRegistry.register(eventHandlerClasses.toArray(Class<?>[]::new));
+      }
+
+      private EventHandlerInvocationStrategy getEventHandlerInvocationStrategy(
+          InstanceProvider instanceProvider) {
+        try {
+          if (eventHandlerInvocationStrategyClass == null
+              || eventHandlerInvocationStrategyClass == SyncEventHandlerInvocationStrategy.class) {
+            return SyncEventHandlerInvocationStrategy.DEFAULT;
+          }
+
+          return (EventHandlerInvocationStrategy)
+              instanceProvider.getInstance(eventHandlerInvocationStrategyClass);
+        } catch (Exception ex) {
+          throw new IllegalStateException(
+              "Failed to get an event handler invocation strategy from instance provider: "
+                  + eventHandlerInvocationStrategyClass,
+              ex);
+        }
       }
     }
   }
