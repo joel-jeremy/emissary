@@ -14,7 +14,6 @@ import io.github.joeljeremy.emissary.core.internal.LambdaFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -25,7 +24,6 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private final RegisteredEventHandlersByEventType eventHandlersByEventType =
       new RegisteredEventHandlersByEventType();
-
   private final InstanceProvider instanceProvider;
   private final Set<Class<? extends Annotation>> eventHandlerAnnotations;
 
@@ -71,19 +69,14 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
     requireNonNull(eventType);
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    List<RegisteredEventHandler<T>> eventHandlers = (List) eventHandlersByEventType.get(eventType);
-
-    // Internal list is mutable. Always wrap in an unmodifiable list here.
-    return Collections.unmodifiableList(eventHandlers);
+    List<RegisteredEventHandler<T>> eventHandlers =
+        (List) eventHandlersByEventType.getImmutable(eventType);
+    return eventHandlers;
   }
 
   private void register(Class<?> eventType, Method eventHandlerMethod) {
-    requireNonNull(eventType);
-    requireNonNull(eventHandlerMethod);
-
-    List<RegisteredEventHandler<?>> handlers = eventHandlersByEventType.get(eventType);
-
-    handlers.add(buildEventHandler(eventHandlerMethod, instanceProvider));
+    eventHandlersByEventType.register(
+        eventType, buildEventHandler(eventHandlerMethod, instanceProvider));
   }
 
   private boolean isEventHandler(Method method) {
@@ -97,9 +90,6 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private static RegisteredEventHandler<?> buildEventHandler(
       Method eventHandlerMethod, InstanceProvider instanceProvider) {
-
-    requireNonNull(eventHandlerMethod);
-
     EventHandlerMethod eventHandlerMethodLambda =
         LambdaFactory.createLambdaFunction(eventHandlerMethod, EventHandlerMethod.class);
 
@@ -140,14 +130,59 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
     Set<Class<? extends Annotation>> merged = new HashSet<>(eventHandlerAnnotations);
     // The native @EventHandler annotation.
     merged.add(EventHandler.class);
-    return Collections.unmodifiableSet(merged);
+    return Set.copyOf(merged);
   }
 
   private static class RegisteredEventHandlersByEventType
       extends ClassValue<List<RegisteredEventHandler<?>>> {
+    private ImmutableRegisteredEventHandlersByEventType immutableDecorator =
+        new ImmutableRegisteredEventHandlersByEventType(this);
+
     @Override
     protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
       return new ArrayList<>();
+    }
+
+    public List<RegisteredEventHandler<?>> getImmutable(Class<?> eventType) {
+      return immutableDecorator.get(eventType);
+    }
+
+    public void register(Class<?> eventType, RegisteredEventHandler<?> eventHandler) {
+      requireNonNull(eventType);
+      requireNonNull(eventHandler);
+
+      get(eventType).add(eventHandler);
+
+      // Because this ClassValue has changed, we need to re-initialize the immutable
+      // ClassValue so that the cached values are thrown away. The next `getImmutable` would then
+      // invoke the immutable ClassValue's `computeValue` method to return the updated list which
+      // includes the newly registered handlers.
+      refreshImmutables();
+    }
+
+    private void refreshImmutables() {
+      immutableDecorator = new ImmutableRegisteredEventHandlersByEventType(this);
+    }
+  }
+
+  /**
+   * Decorates another {@code ClassValue<List<RegisteredEventHandler<?>>>} instance to return
+   * immutable lists.
+   */
+  private static class ImmutableRegisteredEventHandlersByEventType
+      extends ClassValue<List<RegisteredEventHandler<?>>> {
+
+    private final ClassValue<List<RegisteredEventHandler<?>>> base;
+
+    public ImmutableRegisteredEventHandlersByEventType(
+        ClassValue<List<RegisteredEventHandler<?>>> base) {
+      this.base = requireNonNull(base);
+    }
+
+    @Override
+    protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
+      // Take advantage of the performance benefits of immutable lists.
+      return List.copyOf(base.get(eventType));
     }
   }
 }
