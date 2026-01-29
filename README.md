@@ -67,9 +67,11 @@ module foo.bar {
 }
 ```
 
-## Performance
+## What differentiates Emissary?
 
-What differentiates Emissary from other messaging/dispatch libraries? It takes advantage of [java.lang.invoke.LambdaMetafactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html) to avoid the cost of invoking methods reflectively. This results in performance close to directly invoking the request handler and event handler methods!
+### Performance
+
+Emissary is orders of magnitude more performant than similar libraries. It takes advantage of [java.lang.invoke.LambdaMetafactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html) to avoid the cost of invoking methods reflectively. This results in performance close to directly invoking the request handler and event handler methods!
 
 ### ~ 1000% more throughput compared to other similar libraries (Spring's ApplicationEventPublisher, Pipelinr, EventBus)
 ### ~ 90% faster compared to other similar libraries (Spring's ApplicationEventPublisher, Pipelinr, EventBus)
@@ -82,7 +84,141 @@ What differentiates Emissary from other messaging/dispatch libraries? It takes a
 
 ### [Java 11 Benchmarks](https://jmh.morethan.io/?source=https://raw.githubusercontent.com/joel-jeremy/emissary/main/emissary-core/src/jmh/java/io/github/joeljeremy/emissary/core/benchmarks/results-java11.json)
 
-## Requests
+### Easy Integration with Dependency Injection (DI) Frameworks
+
+Other libraries forces users to instantiate the handlers/subscribers during startup/creation-time (usually by manually instantiating them) e.g.
+
+ ```java
+ // Manually instantiate subscriber and all its possible dependencies
+ eventBus.subscribe(new MySubscriber(new MyDependency()))
+ ```
+ 
+This means that these handlers/subscribers are not managed by your application's DI framework and are essentially singleton instances.
+
+Emissary takes a different approach by allowing users to leverage their application's DI framework to instantiate and manage the request/event handlers. This enables the following (non-exhaustive list):
+
+- Injection of services/dependencies
+- Configurable instance lifetime/scope (singleton / new instance per message, etc.)
+- Hooks to instance lifecycles (Spring's @PostConstruct and @PreDestroy, etc.)
+
+> [!NOTE]  
+> Emissary abstracts DI frameworks via an [InstanceProvider](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/InstanceProvider.java) interface. This interface can be implemented by forwarding requests to a DI framework such as Spring's `ApplicationContext`, Guice's `Injector`, etc. It can also be implemented by simply `new`-ing up the request/event handlers when not using any DI framework.
+>
+> Emissary will get request/event handler instances from [InstanceProvider](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/InstanceProvider.java) every time a request/event is dispatched.
+
+#### Example with Spring Boot/ApplicationContext
+
+
+```java
+// Spring features work on the request/event handlers.
+@Component
+public class MyRequestHandler {
+    private final MyDependency myDependency;
+
+    // This works!
+    public MyRequestHandler(MyDepenedency myDependency) {
+        this.myDependency = myDependency;
+    }
+
+    // This also works!
+    @PostConstruct
+    public void postConstruct() {}
+
+    // This works too!
+    @PreDestroy
+    public void preDestroy() {}
+
+    @RequestHandler
+    public void handle(MyRequest request) {
+        // Handle
+    }
+}
+```
+
+##### Spring Boot
+
+```java
+@Bean
+public Emissary emissary(ApplicationContext applicationContext) {
+    return Emissary.builder()
+        // Set instanceProvider to Spring's ApplicationContext::getBean function.
+        .instanceProvider(applicationContext::getBean)
+        .requests(MyRequestHandler.class)
+        .events(...)
+        .build();
+}
+
+@RestController
+public class MyFooController {
+    private final Emissary emissary;
+
+    public MyFooController(Emissary emissary) {
+        this.emissary = emissary;
+    }
+
+    @PostMapping("/foo")
+    public void newFoo(@RequestBody Foo foo) {
+        emissary.send(new CreateNewFoo(foo));
+    }
+}
+```
+
+##### Plain Spring ApplicationContext
+
+```java
+public static void main(String[] args) {
+  ApplicationContext applicationContext = springApplicationContext();
+  Emissary emissary = Emissary.builder()
+        // Set instanceProvider to Spring's ApplicationContext::getBean function.
+        .instanceProvider(applicationContext::getBean)
+        .requests(MyRequestHandler.class)
+        .events(...)
+        .build();
+}
+```
+
+#### Example with Guice's Injector
+
+```java
+public static void main(String[] args) {
+  Injector injector = guiceInjector();
+  Emissary emissary = Emissary.builder()
+        // Set instanceProvider to Guice's Injector::getInstance function.
+        .instanceProvider(injector::getInstance)
+        .requests(...)
+        .events(...)
+        .build();
+}
+```
+
+#### Example with No DI framework
+
+```java
+// Application.java
+
+public static void main(String[] args) {
+  Emissary emissary = Emissary.builder()
+        // Set instanceProvider to own implementation
+        .instanceProvider(Application::getInstance)
+        .requests(...)
+        .events(...)
+        .build();
+}
+
+private static Object getInstance(Class<?> handlerType) {
+  if (MyRequestHandler.class.equals(handlerType)) {
+    return new MyRequestHandler();
+  } else if (MyEventHandler.class.equals(handlerType)) {
+    return new MyEventHandler();
+  }
+
+  throw new IllegalStateException("Failed to get instance for " + handlerType.getName() + ".");
+}
+```
+
+## Concepts and Terminologies
+
+### Requests
 
 Requests are messages that either:
 
@@ -117,7 +253,7 @@ public class GetFooByNameQuery implements Request<Foo> {
 }
 ```
 
-## Request Handlers
+### Request Handlers
 
 Requests are handled by request handlers. Request handlers can be registered through the use of the [@RequestHandler](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/RequestHandler.java) annotation.
 
@@ -141,7 +277,7 @@ public class GetFooQueryHandler {
 }
 ```
 
-## Request Dispatcher
+### Request Dispatcher
 
 Requests are dispatched to a single request handler and this can be done through a dispatcher.
 
@@ -165,7 +301,7 @@ public static void main(String[] args) {
 }
 ```
 
-## Events
+### Events
 
 Events are messages that indicate that something has occurred in the system.
 
@@ -183,7 +319,7 @@ public class FooCreatedEvent implements Event {
 }
 ```
 
-## Event Handlers
+### Event Handlers
 
 Events are handled by event handlers. Event handlers can be registered through the use of the [@EventHandler](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/EventHandler.java) annotation.
 
@@ -203,7 +339,7 @@ public class FooEventHandler {
 }
 ```
 
-## Event Publisher
+### Event Publisher
 
 Events are dispatched to zero or more event handlers and this can be done through a publisher.
 
@@ -224,73 +360,9 @@ public static void main(String[] args) {
 }
 ```
 
-## Easy Integration with Dependency Injection (DI) Frameworks
+## Advanced Features
 
-The library provides an [InstanceProvider](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/InstanceProvider.java) interface as an extension point to let users customize how request/event handler instances should be instantiated. This can be as simple as `new`-ing up request/event handlers or getting instances from a DI framework such as Spring's `ApplicationContext`, Guice's `Injector`, etc.
-
-### Example with No DI framework
-
-```java
-// Application.java
-
-public static void main(String[] args) {
-  Emissary emissary = Emissary.builder()
-      .instanceProvider(Application::getInstance)
-      .requests(...)
-      .events(...)
-      .build();
-}
-
-private static Object getInstance(Class<?> handlerType) {
-  if (MyRequestHandler.class.equals(handlerType)) {
-    return new MyRequestHandler();
-  } else if (MyEventHandler.class.equals(handlerType)) {
-    return new MyEventHandler();
-  }
-
-  throw new IllegalStateException("Failed to get instance for " + handlerType.getName() + ".");
-}
-```
-
-### Example with Spring's ApplicationContext
-
-```java
-public static void main(String[] args) {
-  ApplicationContext applicationContext = springApplicationContext();
-  Emissary emissary = Emissary.builder()
-      .instanceProvider(applicationContext::getBean)
-      .requests(...)
-      .events(...)
-      .build();
-}
-```
-
-```java
-// Spring Boot
-@Bean
-Emissary emissary(ApplicationContext applicationContext) {
-    return Emissary.builder()
-        .instanceProvider(applicationContext::getBean)
-        .requests(...)
-        .events(...)
-        .build();
-}
-```
-
-### Example with Guice's Injector
-
-```java
-public static void main(String[] args) {
-  Injector injector = guiceInjector();
-  Emissary emissary = Emissary.builder()
-      .instanceProvider(injector::getInstance)
-      .requests(...)
-      .events(...)
-      .build();
-}
-```
-
-## Custom Request/Event Handler Annotations
+### Custom Request/Event Handler Annotations
 
 In cases where a project is built in such a way that bringing in external dependencies is considered a bad practice (e.g. domain layer/package in a Hexagonal (Ports and Adapters) architecture), Emissary provides a way to use custom request/event handler annotations (in addition to the built-in [RequestHandler](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/RequestHandler.java) and [EventHandler](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/EventHandler.java) annotations) to annotate request/event handlers.
 
@@ -337,7 +409,7 @@ public static void main(String[] args) {
 }
 ```
 
-## Custom Invocation Strategies
+### Custom Invocation Strategies
 
 The library provides [Emissary.RequestHandlerInvocationStrategy](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/Emissary.java) and [Emissary.EventHandlerInvocationStrategy](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/Emissary.java) interfaces as extension points to let users customize how request/event handler methods are invoked by the Dispatcher and Publisher.
 
