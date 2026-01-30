@@ -4,7 +4,6 @@ import an.awesome.pipelinr.Command;
 import an.awesome.pipelinr.Notification;
 import an.awesome.pipelinr.Pipelinr;
 import an.awesome.pipelinr.Voidy;
-import com.squareup.otto.Bus;
 import com.squareup.otto.ThreadEnforcer;
 import io.github.joeljeremy.emissary.core.Emissary;
 import io.github.joeljeremy.emissary.core.Event;
@@ -18,6 +17,11 @@ import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 import io.reactivex.rxjava3.subjects.Subject;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.se.SeContainer;
+import jakarta.enterprise.inject.se.SeContainerInitializer;
+import jakarta.inject.Inject;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import net.engio.mbassy.bus.MBassador;
@@ -33,6 +37,7 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.springframework.context.ApplicationEventPublisher;
@@ -81,7 +86,19 @@ public abstract class Benchmarks {
 
     private OttoEvent ottoEvent;
     private OttoEventSubscriber ottoEventSubscriber;
-    private Bus ottoBus;
+    private com.squareup.otto.Bus ottoBus;
+
+    private CdiWeldEvent cdiWeldEvent;
+    private SeContainer cdiWeldContainer;
+    private CdiWeldEventObserver cdiWeldEventObserver;
+    private CdiWeldEventPublisher cdiWeldEventPublisher;
+
+    @TearDown
+    public void tearDown() {
+      if (cdiWeldContainer != null) {
+        cdiWeldContainer.close();
+      }
+    }
 
     @Setup
     public void setup(Blackhole blackhole) throws Throwable {
@@ -152,8 +169,20 @@ public abstract class Benchmarks {
 
       ottoEvent = new OttoEvent();
       ottoEventSubscriber = new OttoEventSubscriber(blackhole);
-      ottoBus = new Bus(ThreadEnforcer.ANY);
+      ottoBus = new com.squareup.otto.Bus(ThreadEnforcer.ANY);
       ottoBus.register(ottoEventSubscriber);
+
+      // CDI Events
+
+      cdiWeldEvent = new CdiWeldEvent();
+      cdiWeldContainer =
+          SeContainerInitializer.newInstance()
+              .disableDiscovery()
+              .addBeanClasses(CdiWeldEventPublisher.class, CdiWeldEventObserver.class)
+              .initialize();
+      cdiWeldEventObserver = cdiWeldContainer.select(CdiWeldEventObserver.class).get();
+      cdiWeldEventObserver.setBlackhole(blackhole);
+      cdiWeldEventPublisher = cdiWeldContainer.select(CdiWeldEventPublisher.class).get();
     }
   }
 
@@ -205,6 +234,11 @@ public abstract class Benchmarks {
   @Benchmark
   public void ottoEvent(BenchmarkState state) {
     state.ottoBus.post(state.ottoEvent);
+  }
+
+  @Benchmark
+  public void cdiWeldEvent(BenchmarkState state) {
+    state.cdiWeldEventPublisher.fire(state.cdiWeldEvent);
   }
 
   // Single dispatch benchmarks.
@@ -387,6 +421,30 @@ public abstract class Benchmarks {
 
     @com.squareup.otto.Subscribe
     public void handle(OttoEvent event) {
+      blackhole.consume(event);
+    }
+  }
+
+  public static class CdiWeldEvent {}
+
+  @ApplicationScoped
+  public static class CdiWeldEventPublisher {
+    @Inject private jakarta.enterprise.event.Event<CdiWeldEvent> event;
+
+    public void fire(CdiWeldEvent event) {
+      this.event.fire(event);
+    }
+  }
+
+  @ApplicationScoped
+  public static class CdiWeldEventObserver {
+    private Blackhole blackhole;
+
+    public void setBlackhole(Blackhole blackhole) {
+      this.blackhole = blackhole;
+    }
+
+    public void onEvent(@Observes CdiWeldEvent event) {
       blackhole.consume(event);
     }
   }
