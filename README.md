@@ -99,24 +99,24 @@ Emissary takes a different approach by allowing users to leverage their applicat
 
 - Injection of services/dependencies
 - Configurable instance lifetime/scope (singleton / new instance per message, etc.)
-- Hooks to instance lifecycles (Spring's @PostConstruct and @PreDestroy, etc.)
+- Hooks to instance lifecycles (Spring or Jakarta CDI @PostConstruct and @PreDestroy, etc.)
 
 > [!NOTE]  
-> Emissary abstracts DI frameworks via an [InstanceProvider](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/InstanceProvider.java) interface. This interface can be implemented by forwarding requests to a DI framework such as Spring's `ApplicationContext`, Guice's `Injector`, etc. It can also be implemented by simply `new`-ing up the request/event handlers when not using any DI framework.
+> Emissary abstracts DI frameworks via an [InstanceProvider](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/InstanceProvider.java) interface. This interface can be implemented by forwarding requests to a DI framework such as Spring's `ApplicationContext`, Guice's `Injector`, Jakarta CDI's `BeanContainer`, etc. It can also be implemented by simply `new`-ing up the request/event handlers when not using any DI framework.
 >
 > Emissary will get request/event handler instances from [InstanceProvider](emissary-core/src/main/java/io/github/joeljeremy/emissary/core/InstanceProvider.java) every time a request/event is dispatched.
 
-#### Example with Spring Boot/ApplicationContext
+#### Example Integration with Spring Boot/ApplicationContext
 
 
 ```java
 // Spring features work on the request/event handlers.
 @Component
-public class MyRequestHandler {
+public class MyEventHandler {
     private final MyDependency myDependency;
 
     // This works!
-    public MyRequestHandler(MyDepenedency myDependency) {
+    public MyEventHandler(MyDependency myDependency) {
         this.myDependency = myDependency;
     }
 
@@ -128,9 +128,31 @@ public class MyRequestHandler {
     @PreDestroy
     public void preDestroy() {}
 
-    @RequestHandler
-    public void handle(MyRequest request) {
-        // Handle
+    @EventHandler
+    public void fooCreatedEvent(FooCreatedEvent event) {
+        doSomethingAboutFoo();
+        myDependency.doAnotherThingAboutFoo();
+    }
+
+    @EventHandler
+    public void myEvent(MyEvent event) {
+        doSomething();
+        myDependency.doAnotherThing();
+    }
+}
+
+@Configuration
+public class MyConfiguration {
+    @Bean
+    public Emissary emissary(ApplicationContext applicationContext) {
+        return Emissary.builder()
+            // Set instanceProvider to Spring's ApplicationContext::getBean function.
+            // This means that all instances required by Emissary will be resolved
+            // from the Spring context.
+            .instanceProvider(applicationContext::getBean)
+            .requests(...)
+            .events(MyEventHandler.class)
+            .build();
     }
 }
 ```
@@ -138,15 +160,7 @@ public class MyRequestHandler {
 ##### Spring Boot
 
 ```java
-@Bean
-public Emissary emissary(ApplicationContext applicationContext) {
-    return Emissary.builder()
-        // Set instanceProvider to Spring's ApplicationContext::getBean function.
-        .instanceProvider(applicationContext::getBean)
-        .requests(MyRequestHandler.class)
-        .events(...)
-        .build();
-}
+// MyConfiguration is auto-detected by Spring Boot as long as it's in the proper location.
 
 @RestController
 public class MyFooController {
@@ -157,8 +171,9 @@ public class MyFooController {
     }
 
     @PostMapping("/foo")
-    public void newFoo(@RequestBody Foo foo) {
-        emissary.send(new CreateNewFoo(foo));
+    public void newFoo(@RequestBody CreateFooRequest request) {
+        Foo foo = createFoo(request);
+        emissary.publish(new FooCreatedEvent(foo));
     }
 }
 ```
@@ -167,27 +182,73 @@ public class MyFooController {
 
 ```java
 public static void main(String[] args) {
-  ApplicationContext applicationContext = springApplicationContext();
-  Emissary emissary = Emissary.builder()
-        // Set instanceProvider to Spring's ApplicationContext::getBean function.
-        .instanceProvider(applicationContext::getBean)
-        .requests(MyRequestHandler.class)
-        .events(...)
-        .build();
+    // Configure Spring context.
+    try (var applicationContext = new AnnotationConfigApplicationContext(MyConfiguration.class)) {
+
+        Emissary emissary = applicationContext.getBean(Emissary.class);
+
+        emissary.publish(new MyEvent());
+    }
 }
 ```
 
-#### Example with Guice's Injector
+#### Example Integration with Guice
 
 ```java
+public class MyModule extends AbstractModule {
+    @Override
+    protected void configure() {
+        // Other bindings
+    }
+
+    @Provides
+    Emissary emissary(Injector injector) {
+        return Emissary emissary = Emissary.builder()
+            // Set instanceProvider to Guice's Injector::getInstance function.
+            // This means all instances required by Emissary will be resolved
+            // from the Guice container.
+            .instanceProvider(injector::getInstance)
+            .requests(...)
+            .events(...)
+            .build();
+    }
+}
+
 public static void main(String[] args) {
-  Injector injector = guiceInjector();
-  Emissary emissary = Emissary.builder()
-        // Set instanceProvider to Guice's Injector::getInstance function.
-        .instanceProvider(injector::getInstance)
+    // Configure Guice.
+    Injector injector = Guice.createInjector(new MyModule())
+
+    Emissary emissary = injector.getInstance(Emissary.class);
+
+    emissary.publish(new MyEvent())
+}
+```
+
+#### Example Integration with Jakarta CDI
+
+```java
+@Produces
+Emissary emissary(BeanContainer beanContainer) {
+    return Emissary emissary = Emissary.builder()
+        // Set instanceProvider get instances from CDI's BeanContainer.
+        // This means all instances required by Emissary will be resolved
+        // from the Jakarta CDI container.
+        .instanceProvider(clazz -> beanContainer.select(clazz).get())
         .requests(...)
         .events(...)
         .build();
+}
+
+public static void main(String[] args) {
+    SeContainerInitializer containerInitializer = SeContainerInitializer.newInstance();
+    // Configure CDI container using initializer
+    try (SeContainer container = containerInitializer.initialize()) {
+        BeanContainer beanContainer = container.getBeanContainer();
+        
+        Emissary emissary = beanContainer.select(Emissary.class).get();
+
+        emissary.publish(new MyEvent());
+    }
 }
 ```
 
