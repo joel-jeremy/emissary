@@ -12,6 +12,7 @@ dependencies {
   jmh("net.engio:mbassador:1.3.2")
   jmh("io.reactivex.rxjava3:rxjava:3.1.12")
   jmh("com.squareup:otto:1.3.8")
+  jmh("org.jboss.weld.se:weld-se-shaded:6.0.4.Final")
 }
 
 val commonJmhVersion = "1.37"
