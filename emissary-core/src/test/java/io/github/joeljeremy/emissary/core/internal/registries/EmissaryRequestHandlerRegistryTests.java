@@ -28,6 +28,7 @@ import io.github.joeljeremy.emissary.core.testfixtures.VoidRequest;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 import java.util.Set;
+import java.util.WeakHashMap;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,8 @@ public class EmissaryRequestHandlerRegistryTests {
     @Test
     @DisplayName("should throw when instance provider argument is null")
     void test1() {
-      Set<Class<? extends Annotation>> requestHandlerAnnotations = Set.of();
+      WeakHashMap<Class<? extends Annotation>, Void> requestHandlerAnnotations =
+          new WeakHashMap<>();
 
       assertThrows(
           NullPointerException.class,
@@ -87,7 +89,7 @@ public class EmissaryRequestHandlerRegistryTests {
       CustomAnnotationRequestHandler customAnnotationRequestHandler =
           TestRequestHandlers.customAnnotationRequestHandler();
       EmissaryRequestHandlerRegistry requestHandlerRegistry =
-          buildRequestHandlerRegistry(
+          buildRequestHandlerRegistryWithCustomAnnotations(
               Set.of(CustomRequestHandler.class), customAnnotationRequestHandler);
 
       requestHandlerRegistry.register(customAnnotationRequestHandler.getClass());
@@ -271,13 +273,18 @@ public class EmissaryRequestHandlerRegistryTests {
 
   private static EmissaryRequestHandlerRegistry buildRequestHandlerRegistry(
       Object... requestHandlers) {
-    return new EmissaryRequestHandlerRegistry(TestInstanceProviders.of(requestHandlers), Set.of());
+    return new EmissaryRequestHandlerRegistry(
+        TestInstanceProviders.of(requestHandlers), new WeakHashMap<>());
   }
 
-  private static EmissaryRequestHandlerRegistry buildRequestHandlerRegistry(
+  private static EmissaryRequestHandlerRegistry buildRequestHandlerRegistryWithCustomAnnotations(
       Set<Class<? extends Annotation>> requestHandlerAnnotations, Object... requestHandlers) {
+    WeakHashMap<Class<? extends Annotation>, Void> annotationsWeakMap = new WeakHashMap<>();
+    for (Class<? extends Annotation> annotationClass : requestHandlerAnnotations) {
+      annotationsWeakMap.put(annotationClass, null);
+    }
     return new EmissaryRequestHandlerRegistry(
-        TestInstanceProviders.of(requestHandlers), requestHandlerAnnotations);
+        TestInstanceProviders.of(requestHandlers), annotationsWeakMap);
   }
 
   static class RequestWithNoHandler implements Request<Void> {}

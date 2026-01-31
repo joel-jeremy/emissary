@@ -16,11 +16,8 @@ import io.github.joeljeremy.emissary.core.internal.VoidRequestHandlerMethod;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.WeakHashMap;
 
 /** The default request handler registry. */
@@ -34,24 +31,25 @@ public class EmissaryRequestHandlerRegistry
    * Map key is the request type. It returns another map whose key is the result type. The second
    * map returns the request handler mapped to the result type.
    */
-  private final Map<Type, Map<Type, RegisteredRequestHandler<?, ?>>> mappingsByRequestType =
-      new WeakHashMap<>();
+  private final WeakHashMap<Type, WeakHashMap<Type, RegisteredRequestHandler<?, ?>>>
+      mappingsByRequestType = new WeakHashMap<>();
 
   private final InstanceProvider instanceProvider;
-  private final Set<Class<? extends Annotation>> requestHandlerAnnotations;
+  private final WeakHashMap<Class<? extends Annotation>, Void> customRequestHandlerAnnotations;
 
   /**
    * Constructor.
    *
    * @param instanceProvider The instance provider.
-   * @param requestHandlerAnnotations The supported request handler annotations.
+   * @param customRequestHandlerAnnotations The supported request handler annotations. Using a
+   *     WeakHashMap to avoid holding a strong reference on the annotation classes. The annontation
+   *     classes are the keys and the values are ignored.
    */
   public EmissaryRequestHandlerRegistry(
       InstanceProvider instanceProvider,
-      Set<Class<? extends Annotation>> requestHandlerAnnotations) {
+      WeakHashMap<Class<? extends Annotation>, Void> customRequestHandlerAnnotations) {
     this.instanceProvider = requireNonNull(instanceProvider);
-    this.requestHandlerAnnotations =
-        withNativeRequestHandler(requireNonNull(requestHandlerAnnotations));
+    this.customRequestHandlerAnnotations = requireNonNull(customRequestHandlerAnnotations);
   }
 
   /** {@inheritDoc} */
@@ -124,7 +122,11 @@ public class EmissaryRequestHandlerRegistry
 
   private boolean isRequestHandler(Method method) {
     for (Annotation annotation : method.getAnnotations()) {
-      if (requestHandlerAnnotations.contains(annotation.annotationType())) {
+      if (RequestHandler.class == annotation.annotationType()) {
+        return true;
+      }
+
+      if (customRequestHandlerAnnotations.containsKey(annotation.annotationType())) {
         return true;
       }
     }
@@ -230,14 +232,6 @@ public class EmissaryRequestHandlerRegistry
                   + "handler method's return type '%s'. Please adjust accordingly.",
               resultType.getTypeName(), requestHandlerMethod.getGenericReturnType().getTypeName()));
     }
-  }
-
-  private static Set<Class<? extends Annotation>> withNativeRequestHandler(
-      Set<Class<? extends Annotation>> requestHandlerAnnotations) {
-    Set<Class<? extends Annotation>> merged = new HashSet<>(requestHandlerAnnotations);
-    // The native @RequestHandler annotation.
-    merged.add(RequestHandler.class);
-    return Collections.unmodifiableSet(merged);
   }
 
   private static class PrimitiveTypeMap extends ClassValue<Class<?>> {

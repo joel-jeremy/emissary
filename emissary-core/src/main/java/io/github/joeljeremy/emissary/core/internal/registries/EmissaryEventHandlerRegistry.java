@@ -14,9 +14,8 @@ import io.github.joeljeremy.emissary.core.internal.LambdaFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.WeakHashMap;
 
 /** The default event handler registry. */
 @Internal
@@ -25,18 +24,21 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
   private final RegisteredEventHandlersByEventType eventHandlersByEventType =
       new RegisteredEventHandlersByEventType();
   private final InstanceProvider instanceProvider;
-  private final Set<Class<? extends Annotation>> eventHandlerAnnotations;
+  private final WeakHashMap<Class<? extends Annotation>, Void> customEventHandlerAnnotations;
 
   /**
    * Constructor.
    *
    * @param instanceProvider The instance provider.
-   * @param eventHandlerAnnotations The supported event handler annotations.
+   * @param customEventHandlerAnnotations The supported event handler annotations. Using a
+   *     WeakHashMap to avoid holding a strong reference on the annotation classes. The annontation
+   *     classes are the keys and the values are ignored.
    */
   public EmissaryEventHandlerRegistry(
-      InstanceProvider instanceProvider, Set<Class<? extends Annotation>> eventHandlerAnnotations) {
+      InstanceProvider instanceProvider,
+      WeakHashMap<Class<? extends Annotation>, Void> customEventHandlerAnnotations) {
     this.instanceProvider = requireNonNull(instanceProvider);
-    this.eventHandlerAnnotations = withNativeEventHandler(requireNonNull(eventHandlerAnnotations));
+    this.customEventHandlerAnnotations = requireNonNull(customEventHandlerAnnotations);
   }
 
   /** {@inheritDoc} */
@@ -53,7 +55,7 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
         }
 
         validateMethodParameters(method);
-        validateReturnType(method);
+        validateMethodReturnType(method);
 
         // First parameter in the method is the event object.
         register(method.getParameterTypes()[0], method);
@@ -81,7 +83,11 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
 
   private boolean isEventHandler(Method method) {
     for (Annotation annotation : method.getAnnotations()) {
-      if (eventHandlerAnnotations.contains(annotation.annotationType())) {
+      if (EventHandler.class == annotation.annotationType()) {
+        return true;
+      }
+
+      if (customEventHandlerAnnotations.containsKey(annotation.annotationType())) {
         return true;
       }
     }
@@ -118,19 +124,11 @@ public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, Event
     }
   }
 
-  private static void validateReturnType(Method method) {
+  private static void validateMethodReturnType(Method method) {
     if (!void.class.equals(method.getReturnType())) {
       throw new IllegalArgumentException(
           "Methods marked with @EventHandler must have a void return type.");
     }
-  }
-
-  private static Set<Class<? extends Annotation>> withNativeEventHandler(
-      Set<Class<? extends Annotation>> eventHandlerAnnotations) {
-    Set<Class<? extends Annotation>> merged = new HashSet<>(eventHandlerAnnotations);
-    // The native @EventHandler annotation.
-    merged.add(EventHandler.class);
-    return Set.copyOf(merged);
   }
 
   private static class RegisteredEventHandlersByEventType

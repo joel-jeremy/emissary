@@ -23,6 +23,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.WeakHashMap;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ public class EmissaryEventHandlerRegistryTests {
     @Test
     @DisplayName("should throw when instance provider argument is null")
     void test1() {
-      Set<Class<? extends Annotation>> eventHandlerAnnotations = Set.of();
+      WeakHashMap<Class<? extends Annotation>, Void> eventHandlerAnnotations = new WeakHashMap<>();
 
       assertThrows(
           NullPointerException.class,
@@ -93,7 +94,7 @@ public class EmissaryEventHandlerRegistryTests {
           TestEventHandlers.customAnnotationEventHandler();
 
       EmissaryEventHandlerRegistry eventHandlerRegistry =
-          buildEventHandlerRegistry(
+          buildEventHandlerRegistryWithCustomAnnotations(
               Set.of(customEventHandlerAnnotation), customAnnotationEventHandler);
 
       eventHandlerRegistry.register(customAnnotationEventHandler.getClass());
@@ -238,7 +239,8 @@ public class EmissaryEventHandlerRegistryTests {
       TestEventHandler eventHandler1 = TestEventHandlers.testEventHandler();
       CustomAnnotationEventHandler eventHandler2 = TestEventHandlers.customAnnotationEventHandler();
       EmissaryEventHandlerRegistry eventHandlerRegistry =
-          buildEventHandlerRegistry(Set.of(CustomEventHandler.class), eventHandler1, eventHandler2)
+          buildEventHandlerRegistryWithCustomAnnotations(
+                  Set.of(CustomEventHandler.class), eventHandler1, eventHandler2)
               .register(eventHandler1.getClass());
 
       List<RegisteredEventHandler<TestEvent>> resolved =
@@ -271,13 +273,18 @@ public class EmissaryEventHandlerRegistryTests {
   }
 
   private EmissaryEventHandlerRegistry buildEventHandlerRegistry(Object... eventHandlers) {
-    return new EmissaryEventHandlerRegistry(TestInstanceProviders.of(eventHandlers), Set.of());
+    return new EmissaryEventHandlerRegistry(
+        TestInstanceProviders.of(eventHandlers), new WeakHashMap<>());
   }
 
-  private EmissaryEventHandlerRegistry buildEventHandlerRegistry(
+  private EmissaryEventHandlerRegistry buildEventHandlerRegistryWithCustomAnnotations(
       Set<Class<? extends Annotation>> eventHandlerAnnotations, Object... eventHandlers) {
+    WeakHashMap<Class<? extends Annotation>, Void> annotationsWeakMap = new WeakHashMap<>();
+    for (Class<? extends Annotation> annotationClass : eventHandlerAnnotations) {
+      annotationsWeakMap.put(annotationClass, null);
+    }
     return new EmissaryEventHandlerRegistry(
-        TestInstanceProviders.of(eventHandlers), eventHandlerAnnotations);
+        TestInstanceProviders.of(eventHandlers), annotationsWeakMap);
   }
 
   public static class EventWithNoHandlers implements Event {}
