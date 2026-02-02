@@ -13,11 +13,9 @@ import java.lang.System.Logger.Level;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
+import java.util.WeakHashMap;
 
 /** Checkout Emissary! */
 public class Emissary implements Dispatcher, Publisher {
@@ -195,8 +193,9 @@ public class Emissary implements Dispatcher, Publisher {
 
     /** Request handling configuration. */
     public static final class RequestHandlingConfiguration {
-      private final Set<Class<?>> requestHandlerClasses = new HashSet<>();
-      private final Set<Class<? extends Annotation>> requestHandlerAnnotations = new HashSet<>();
+      private final WeakHashMap<Class<?>, Void> requestHandlerClasses = new WeakHashMap<>();
+      private final WeakHashMap<Class<? extends Annotation>, Void> requestHandlerAnnotations =
+          new WeakHashMap<>();
       private RequestHandlerInvocationStrategy requestHandlerInvocationStrategy =
           new SyncRequestHandlerInvocationStrategy();
 
@@ -214,7 +213,9 @@ public class Emissary implements Dispatcher, Publisher {
       public final RequestHandlingConfiguration handlerAnnotations(
           Class<? extends Annotation>... requestHandlerAnnotations) {
         requireNonNullElements(requestHandlerAnnotations);
-        Collections.addAll(this.requestHandlerAnnotations, requestHandlerAnnotations);
+        for (Class<? extends Annotation> annotation : requestHandlerAnnotations) {
+          this.requestHandlerAnnotations.put(annotation, null);
+        }
         return this;
       }
 
@@ -231,7 +232,9 @@ public class Emissary implements Dispatcher, Publisher {
       public final RequestHandlingConfiguration handlerAnnotations(
           Collection<Class<? extends Annotation>> requestHandlerAnnotations) {
         requireNonNullElements(requestHandlerAnnotations);
-        this.requestHandlerAnnotations.addAll(requestHandlerAnnotations);
+        for (Class<? extends Annotation> annotation : requestHandlerAnnotations) {
+          this.requestHandlerAnnotations.put(annotation, null);
+        }
         return this;
       }
 
@@ -244,7 +247,9 @@ public class Emissary implements Dispatcher, Publisher {
        */
       public final RequestHandlingConfiguration handlers(Class<?>... requestHandlerClasses) {
         requireNonNullElements(requestHandlerClasses);
-        Collections.addAll(this.requestHandlerClasses, requestHandlerClasses);
+        for (Class<?> clazz : requestHandlerClasses) {
+          this.requestHandlerClasses.put(clazz, null);
+        }
         return this;
       }
 
@@ -258,7 +263,9 @@ public class Emissary implements Dispatcher, Publisher {
       public final RequestHandlingConfiguration handlers(
           Collection<Class<?>> requestHandlerClasses) {
         requireNonNullElements(requestHandlerClasses);
-        this.requestHandlerClasses.addAll(requestHandlerClasses);
+        for (Class<?> clazz : requestHandlerClasses) {
+          this.requestHandlerClasses.put(clazz, null);
+        }
         return this;
       }
 
@@ -279,14 +286,16 @@ public class Emissary implements Dispatcher, Publisher {
           InstanceProvider instanceProvider) {
         var requestHandlerRegistry =
             new EmissaryRequestHandlerRegistry(instanceProvider, requestHandlerAnnotations);
-        return requestHandlerRegistry.register(requestHandlerClasses.toArray(Class<?>[]::new));
+        return requestHandlerRegistry.register(
+            requestHandlerClasses.keySet().toArray(Class<?>[]::new));
       }
     }
 
     /** Event handling configuration. */
     public static final class EventHandlingConfiguration {
-      private final Set<Class<?>> eventHandlerClasses = new HashSet<>();
-      private final Set<Class<? extends Annotation>> eventHandlerAnnotations = new HashSet<>();
+      private final WeakHashMap<Class<?>, Void> eventHandlerClasses = new WeakHashMap<>();
+      private final WeakHashMap<Class<? extends Annotation>, Void> eventHandlerAnnotations =
+          new WeakHashMap<>();
       private EventHandlerInvocationStrategy eventHandlerInvocationStrategy =
           new SyncEventHandlerInvocationStrategy();
 
@@ -304,7 +313,9 @@ public class Emissary implements Dispatcher, Publisher {
       public final EventHandlingConfiguration handlerAnnotations(
           Class<? extends Annotation>... eventHandlerAnnotations) {
         requireNonNullElements(eventHandlerAnnotations);
-        Collections.addAll(this.eventHandlerAnnotations, eventHandlerAnnotations);
+        for (Class<? extends Annotation> annotation : eventHandlerAnnotations) {
+          this.eventHandlerAnnotations.put(annotation, null);
+        }
         return this;
       }
 
@@ -321,7 +332,9 @@ public class Emissary implements Dispatcher, Publisher {
       public final EventHandlingConfiguration handlerAnnotations(
           Collection<Class<? extends Annotation>> eventHandlerAnnotations) {
         requireNonNullElements(eventHandlerAnnotations);
-        this.eventHandlerAnnotations.addAll(eventHandlerAnnotations);
+        for (Class<? extends Annotation> annotation : eventHandlerAnnotations) {
+          this.eventHandlerAnnotations.put(annotation, null);
+        }
         return this;
       }
 
@@ -334,7 +347,9 @@ public class Emissary implements Dispatcher, Publisher {
        */
       public final EventHandlingConfiguration handlers(Class<?>... eventHandlerClasses) {
         requireNonNullElements(eventHandlerClasses);
-        Collections.addAll(this.eventHandlerClasses, eventHandlerClasses);
+        for (Class<?> clazz : eventHandlerClasses) {
+          this.eventHandlerClasses.put(clazz, null);
+        }
         return this;
       }
 
@@ -347,7 +362,9 @@ public class Emissary implements Dispatcher, Publisher {
        */
       public final EventHandlingConfiguration handlers(Collection<Class<?>> eventHandlerClasses) {
         requireNonNullElements(eventHandlerClasses);
-        this.eventHandlerClasses.addAll(eventHandlerClasses);
+        for (Class<?> clazz : eventHandlerClasses) {
+          this.eventHandlerClasses.put(clazz, null);
+        }
         return this;
       }
 
@@ -367,7 +384,7 @@ public class Emissary implements Dispatcher, Publisher {
       private EventHandlerProvider buildEventHandlerProvider(InstanceProvider instanceProvider) {
         var eventHandlerRegistry =
             new EmissaryEventHandlerRegistry(instanceProvider, eventHandlerAnnotations);
-        return eventHandlerRegistry.register(eventHandlerClasses.toArray(Class<?>[]::new));
+        return eventHandlerRegistry.register(eventHandlerClasses.keySet().toArray(Class<?>[]::new));
       }
     }
   }
