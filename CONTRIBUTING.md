@@ -1,4 +1,4 @@
-# Contributing Guidelines
+# Contribution Guidelines
 
 First of all, thank you for having the interest in contributing to this project!
 
