@@ -29,6 +29,10 @@ Emissary aims to make it easy to build applications that apply the [Command Quer
 
 Please consider giving the repository a ⭐. It means a lot! Thank you :)
 
+## Contributing
+
+Feedback and contributions are very much welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines. Please open an [issue](https://github.com/joel-jeremy/emissary/issues) if you run into any problems or have suggestions.
+
 ## Get Emissary
 
 > [!IMPORTANT]  
